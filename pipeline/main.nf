@@ -155,7 +155,7 @@ workflow {
     
     // Gather outputs as lists to pass to aggregation process
     fastp_reports = FASTQ_QC.out.json_report.collect()
-    trimmed_bams = PRIMER_TRIM.out.trimmed_bam.map { tuple -> tuple[1] }.collect()
+    trimmed_bams = PRIMER_TRIM.out.trimmed_bam.flatMap { tuple -> [tuple[1], tuple[2]] }.collect()
     sample_vcfs = VARIANT_CALL.out.vcf.map { tuple -> tuple[1] }.collect()
     sample_consensuses = CONSENSUS_GEN.out.consensus.map { tuple -> tuple[1] }.collect()
     

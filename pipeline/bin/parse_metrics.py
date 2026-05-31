@@ -130,22 +130,15 @@ def calculate_coverage(bam_path, ref_lengths, num_bins=500, min_cov=10):
     depths = {ref_name: [0] * ref_len for ref_name, ref_len in ref_lengths.items()}
     mapped_reads = {ref_name: 0 for ref_name in ref_lengths}
     
-    # Run samtools idxstats to retrieve mapped reads per contig
-    try:
-        cmd = ["samtools", "idxstats", bam_path]
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        for line in result.stdout.strip().split("\n"):
-            if not line:
-                continue
-            parts = line.split("\t")
-            if len(parts) >= 3:
-                ref_name = parts[0]
-                mapped_cnt = int(parts[2])
-                if ref_name in mapped_reads:
-                    mapped_reads[ref_name] = mapped_cnt
-    except Exception as e:
-        print(f"Warning: samtools idxstats failed for {bam_path}: {e}")
-        pass
+    # Run samtools view -c -F 2308 to retrieve primary mapped reads per contig
+    for ref_name in ref_lengths:
+        try:
+            cmd = ["samtools", "view", "-c", "-F", "2308", bam_path, ref_name]
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            mapped_reads[ref_name] = int(result.stdout.strip())
+        except Exception as e:
+            print(f"Warning: samtools view failed for {ref_name} in {bam_path}: {e}")
+            mapped_reads[ref_name] = 0
 
     # Run samtools depth
     try:

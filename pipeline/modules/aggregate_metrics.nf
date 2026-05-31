@@ -20,7 +20,7 @@ process AGGREGATE_METRICS {
 
     script:
     def fastp_list = fastp_jsons.join(',')
-    def bam_list = bams.join(',')
+    def bam_list = bams.findAll { it.name.endsWith('.bam') }.join(',')
     def vcf_list = vcfs.join(',')
     def consensus_list = consensuses.join(',')
     def gff_arg = gff ? "--gff ${gff}" : ""
