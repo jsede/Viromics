@@ -1,0 +1,286 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background: #F8FAFC !important; /* Premium light slate canvas */
+    color: #1E293B !important;     /* Muted dark slate text by default */
+  }
+  
+  /* Sleek light scrollbars */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: #F1F5F9;
+    border-radius: 4px;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: #CBD5E1;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: #DC2626; /* Crimson on hover */
+  }
+}
+
+/* Premium Minimalist Editorial Panels */
+.glass-panel {
+  background: #FFFFFF !important;
+  border: 1px solid #E2E8F0 !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04), 0 2px 4px -1px rgba(0, 0, 0, 0.02) !important;
+  border-radius: 1rem !important;
+  color: #1E293B !important;
+}
+
+.glass-panel-hover {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-panel-hover:hover {
+  background: #FFFFFF !important;
+  border-color: #CBD5E1 !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.06), 0 4px 6px -2px rgba(0, 0, 0, 0.04) !important;
+  transform: translateY(-1px);
+}
+
+/* Linear Genome Browser specific styling */
+.gene-block {
+  transition: all 0.2s ease-in-out;
+}
+.gene-block:hover {
+  filter: brightness(0.95) drop-shadow(0 0 3px rgba(0, 0, 0, 0.1));
+}
+
+/* Shimmer animations for light mode titles */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer-text {
+  background: linear-gradient(90deg, #DC2626, #7C3AED, #10B981, #DC2626);
+  background-size: 200% auto;
+  color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: shimmer 8s linear infinite;
+}
+
+/* Breathing glow effect for Crimson */
+@keyframes breathe {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(220, 38, 38, 0.1), 0 0 1px rgba(220, 38, 38, 0.05);
+  }
+  50% {
+    box-shadow: 0 0 15px rgba(220, 38, 38, 0.2), 0 0 4px rgba(220, 38, 38, 0.1);
+  }
+}
+
+.breath-glow-teal {
+  animation: breathe 4s ease-in-out infinite;
+}
+
+/* Custom interactive coverage graph overlays */
+.chart-tooltip-grid {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 4px 12px;
+}
+
+/* Disable all-caps to maintain clean, native Title Case and soft Inter styling */
+.uppercase,
+header .uppercase,
+.glass-panel .uppercase {
+  text-transform: none !important;
+  letter-spacing: normal !important;
+}
+
+/* stark black-filled main app header block with white text (Lab Style) */
+header,
+.bg-dark-card\/80 {
+  background: #090D16 !important; /* solid black-filled header block */
+  border-bottom: 1px solid #1E293B !important;
+}
+
+header h1,
+header h2,
+header h3,
+header span,
+header strong,
+header select,
+header option {
+  color: #FFFFFF !important;
+}
+
+/* general panel overrides to convert light-text to readable dark text */
+.glass-panel h1,
+.glass-panel h2,
+.glass-panel h3,
+.glass-panel h4,
+.glass-panel h5,
+.glass-panel .text-white,
+.glass-panel strong.text-white,
+.glass-panel span.text-white {
+  color: #0F172A !important; /* Obsidian black titles */
+}
+
+.glass-panel p,
+.glass-panel .text-gray-300,
+.glass-panel span.text-gray-300,
+.glass-panel td.text-gray-300 {
+  color: #334155 !important; /* Charcoal body text */
+}
+
+.glass-panel p.text-gray-400,
+.glass-panel span.text-gray-400,
+.glass-panel div.text-gray-400,
+.glass-panel td.text-gray-400,
+.glass-panel th.text-gray-400 {
+  color: #64748B !important; /* Slate gray subtitles */
+}
+
+.glass-panel .text-gray-200,
+.glass-panel td.text-gray-200 {
+  color: #1E293B !important;
+}
+
+.glass-panel select,
+.glass-panel select option {
+  background-color: #FFFFFF !important;
+  color: #0F172A !important;
+  border-color: #CBD5E1 !important;
+}
+
+/* Prevent overrides on badge texts or elements that intentionally need white text */
+.glass-panel .bg-brand-teal .text-white,
+.glass-panel .bg-brand-rose .text-white,
+.glass-panel .bg-brand-emerald .text-white,
+.glass-panel button .text-white,
+.glass-panel button,
+.glass-panel button span,
+.glass-panel .shadow-glow-teal span,
+.glass-panel span.bg-brand-teal,
+.glass-panel span.bg-brand-rose,
+.glass-panel span.bg-brand-emerald,
+.glass-panel span.bg-brand-violet,
+.glass-panel span.bg-brand-indigo,
+.glass-panel span.bg-brand-amber {
+  color: #FFFFFF !important; /* Keep white text inside filled diagnostic badges */
+}
+
+/* Clean, readable table overrides for Light Mode */
+.glass-panel .bg-dark-bg\/40,
+.glass-panel .bg-dark-bg\/60,
+.glass-panel .bg-dark-bg,
+.glass-panel table {
+  background-color: #F8FAFC !important; /* light slate background for outer table grids */
+  color: #1E293B !important;
+  border-color: #E2E8F0 !important;
+}
+
+.glass-panel thead tr,
+.glass-panel tr.bg-dark-bg\/60 {
+  background-color: #F1F5F9 !important; /* light silver-gray for column header row (nature style!) */
+  color: #0F172A !important;
+  border-bottom: 2px solid #E2E8F0 !important;
+}
+
+.glass-panel tbody tr,
+.glass-panel tr.border-b {
+  background-color: #FFFFFF !important; /* crisp white for standard rows */
+  color: #334155 !important;
+  border-bottom-color: #E2E8F0 !important;
+}
+
+.glass-panel tbody tr:hover,
+.glass-panel tr.hover\:bg-dark-hover\/40:hover {
+  background-color: #F8FAFC !important; /* light hover highlight */
+}
+
+/* Highlight boxes / alert boxes overrides */
+.glass-panel .bg-dark-bg\/20,
+.glass-panel .bg-dark-bg\/10,
+.glass-panel .bg-brand-teal\/5,
+.glass-panel .border-dark-border\/60 {
+  background-color: #F1F5F9 !important; /* soft cool slate highlights */
+  border-color: #E2E8F0 !important;
+  color: #334155 !important;
+}
+
+.glass-panel .bg-dark-card {
+  background-color: #FFFFFF !important;
+  border-color: #E2E8F0 !important;
+  color: #334155 !important;
+}
+
+.glass-panel .hover\:bg-dark-hover:hover {
+  background-color: #F1F5F9 !important;
+}
+
+/* Coverage depth chart light styling adjustments */
+.recharts-responsive-container text {
+  fill: #475569 !important; /* clean dark gray text for chart ticks */
+}
+
+/* UPGMA phylogenetic tree lines override for light theme visibility */
+.glass-panel svg.tree-svg line {
+  stroke-opacity: 0.8;
+  stroke: #CBD5E1 !important;
+}
+
+.glass-panel svg.tree-svg text {
+  fill: #334155 !important;
+}
+
+/* Print utility for PDF report generator */
+@media print {
+  body, html {
+    background: white !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    min-height: auto !important;
+    display: block !important;
+  }
+
+  /* Reset outer application flexboxes, margins, and paddings during print */
+  div.min-h-screen,
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    min-height: auto !important;
+    display: block !important;
+    background: transparent !important;
+    border: none !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-card {
+    border: none !important;
+    background: #FFFFFF !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    page-break-inside: avoid !important;
+    page-break-before: avoid !important;
+  }
+}

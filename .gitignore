@@ -1,0 +1,21 @@
+# Dependency directories
+node_modules/
+dashboard/node_modules/
+
+# Nextflow runtime metadata and logs
+.nextflow/
+.nextflow.log*
+work/
+
+# Large run directories, raw inputs, and workflow results
+results/
+runs/
+
+# Production build outputs
+dist/
+dashboard/dist/
+
+# OS specific files
+.DS_Store
+Thumbs.db
+Desktop.ini

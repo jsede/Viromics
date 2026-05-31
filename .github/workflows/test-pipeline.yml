@@ -1,0 +1,56 @@
+name: Viromics Pipeline & Dashboard CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  test-pipeline:
+    name: Nextflow Pipeline Syntax & Compilation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install Nextflow
+        run: |
+          curl -s https://get.nextflow.io | bash
+          chmod +x nextflow
+          sudo mv nextflow /usr/local/bin/
+
+      - name: Verify Nextflow version
+        run: nextflow -v
+
+      - name: Dry-run pipeline compiler check
+        run: |
+          nextflow run pipeline/main.nf --help
+
+  test-dashboard:
+    name: React Frontend Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Install dependencies
+        working-directory: dashboard
+        run: npm ci || npm install
+
+      - name: Verify clean build compilation
+        working-directory: dashboard
+        run: npm run build
