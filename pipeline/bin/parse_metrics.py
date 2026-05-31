@@ -53,9 +53,9 @@ def parse_reference(ref_path):
 
 def parse_gff(gff_path):
     """Parse genes and CDS from GFF3 file, grouped by reference sequence ID."""
-    genes = defaultdict(list)
+    features = defaultdict(list)
     if not gff_path or not os.path.exists(gff_path):
-        return dict(genes)
+        return dict(features)
         
     with open(gff_path, 'r') as f:
         for line in f:
@@ -79,10 +79,10 @@ def parse_gff(gff_path):
                         k, v = attr.split("=", 1)
                         attrs[k.strip()] = v.strip()
                 
-                name = attrs.get("Name", attrs.get("gene", attrs.get("ID", "Unknown")))
+                name = attrs.get("gene", attrs.get("Name", attrs.get("ID", "Unknown")))
                 product = attrs.get("product", "").replace("%20", " ")
                 
-                genes[ref_id].append({
+                features[ref_id].append({
                     "name": name,
                     "type": feature_type,
                     "start": start,
@@ -91,10 +91,23 @@ def parse_gff(gff_path):
                     "product": product
                 })
     
-    # Sort genes for each reference by start position
+    # Hierarchical filtering per reference: CDS > gene > exon to prevent duplication clutter
     sorted_genes = {}
-    for ref_id, g_list in genes.items():
-        sorted_genes[ref_id] = sorted(g_list, key=lambda x: x["start"])
+    for ref_id, f_list in features.items():
+        # Check if CDS exists
+        cds_features = [f for f in f_list if f["type"] == "CDS"]
+        if cds_features:
+            selected = cds_features
+        else:
+            gene_features = [f for f in f_list if f["type"] == "gene"]
+            if gene_features:
+                selected = gene_features
+            else:
+                selected = f_list
+                
+        # Sort features for each reference by start position
+        sorted_genes[ref_id] = sorted(selected, key=lambda x: x["start"])
+        
     return sorted_genes
 
 def parse_fastp(fastp_path):
