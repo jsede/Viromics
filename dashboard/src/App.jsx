@@ -812,13 +812,13 @@ export default function App() {
                   </div>
 
                   {activeSample.metadata && Object.keys(activeSample.metadata).length > 0 && (
-                    <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs bg-dark-bg/25 border border-dark-border/40 rounded-2xl p-4">
+                    <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs bg-slate-100/80 border border-slate-200 rounded-2xl p-4 shadow-sm">
                       {Object.entries(activeSample.metadata)
                         .filter(([k]) => k !== 'sample_id')
                         .map(([key, val]) => (
                           <span key={key} className="font-outfit">
-                            <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mr-2">{key.replace('_', ' ')}:</span>
-                            <strong className="text-gray-200 font-medium">{val}</strong>
+                            <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mr-2">{key.replace('_', ' ')}:</span>
+                            <strong className="text-slate-800 font-semibold">{val}</strong>
                           </span>
                         ))
                       }

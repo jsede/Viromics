@@ -284,3 +284,27 @@ header option {
     page-break-before: avoid !important;
   }
 }
+
+/* Top-right header controls styling for solid black header */
+header .bg-dark-card,
+header label,
+header div.bg-dark-card {
+  background-color: #1E293B !important; /* Premium dark-slate background */
+  border-color: #334155 !important;     /* Stronger border */
+}
+
+header label {
+  color: #F1F5F9 !important;            /* High-contrast light gray text for label */
+}
+
+header label:hover {
+  background-color: #334155 !important; /* Hover state */
+}
+
+header span.text-gray-400 {
+  color: #94A3B8 !important;            /* Muted gray for Active Run label */
+}
+
+header strong.text-white {
+  color: #FFFFFF !important;            /* Crisp white for the run ID value */
+}
