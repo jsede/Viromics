@@ -49,10 +49,10 @@ export default function GeneMap({ genes, variants, refLength }) {
 
       {/* SVG Canvas for Linear Map */}
       <div className="relative w-full overflow-x-auto py-4 select-none">
-        <svg viewBox={`0 0 1000 150`} width="100%" className="min-w-[800px]">
+        <svg viewBox={`0 0 1000 160`} width="100%" className="min-w-[800px]">
           {/* Main Genome Axis */}
           <line 
-            x1="20" y1="110" x2="980" y2="110" 
+            x1="20" y1="80" x2="980" y2="80" 
             stroke="#CBD5E1" strokeWidth="5" strokeLinecap="round" 
           />
           
@@ -62,9 +62,9 @@ export default function GeneMap({ genes, variants, refLength }) {
             const x = 20 + pct * 960;
             return (
               <g key={i}>
-                <line x1={x} y1={107} x2={x} y2={113} stroke="#94A3B8" strokeWidth="1.5" />
+                <line x1={x} y1={80} x2={x} y2={86} stroke="#94A3B8" strokeWidth="1.5" />
                 <text 
-                  x={x} y={130} 
+                  x={x} y={145} 
                   fill="#64748B" fontSize="9" textAnchor="middle" 
                   fontFamily="Fira Code"
                 >
@@ -84,8 +84,8 @@ export default function GeneMap({ genes, variants, refLength }) {
             
             // Draw genes alternated top/bottom or height offset to avoid overlapping names
             const isAlternate = idx % 2 === 0;
-            const y = isAlternate ? 35 : 68;
-            const h = 14;
+            const y = isAlternate ? 20 : 48;
+            const h = 12;
             
             const isHovered = hoveredGene && hoveredGene.name === gene.name;
 
@@ -119,11 +119,11 @@ export default function GeneMap({ genes, variants, refLength }) {
             );
           })}
 
-          {/* Variant Marker Pins along the axis */}
+          {/* Variant Marker Pins along the axis (Pointing Downwards to prevent overlaps) */}
           {variants && variants.map((v, idx) => {
             const pct = v.position / refLength;
             const x = 20 + pct * 960;
-            const y = 110;
+            const y = 80;
             
             const isHovered = hoveredVariant && hoveredVariant.position === v.position;
 
@@ -136,13 +136,13 @@ export default function GeneMap({ genes, variants, refLength }) {
               >
                 {/* Vertical Pin Line */}
                 <line 
-                  x1={x} y1={60} x2={x} y2={y} 
+                  x1={x} y1={y} x2={x} y2={115} 
                   stroke={isHovered ? '#DC2626' : '#94A3B8'} 
                   strokeWidth={isHovered ? 2.5 : 1.5}
                 />
                 {/* Pin Head */}
                 <circle 
-                  cx={x} cy={60} 
+                  cx={x} cy={115} 
                   r={isHovered ? 5.5 : 3.5} 
                   fill={isHovered ? '#DC2626' : '#94A3B8'}
                   className="transition-all duration-150"
