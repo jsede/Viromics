@@ -794,7 +794,7 @@ export default function App() {
 
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
                       <span className="text-gray-400">Mapped Reads:</span>
-                      <strong className="text-brand-indigo font-mono text-sm">
+                      <strong className="text-brand-indigo font-mono text-xs">
                         {(() => {
                           const mr = getMappedReadsForSampleRef(activeSample, selectedRefName);
                           const filtered = activeSample.qc?.trimmed_reads || 0;
@@ -804,10 +804,10 @@ export default function App() {
                       </strong>
                       <span className="text-gray-600">|</span>
                       <span className="text-gray-400">Mean Alignment Depth:</span>
-                      <strong className="text-brand-teal font-mono text-sm">{activeCov.mean_depth !== undefined ? activeCov.mean_depth : 0}x</strong>
+                      <strong className="text-brand-teal font-mono text-xs">{activeCov.mean_depth !== undefined ? activeCov.mean_depth : 0}x</strong>
                       <span className="text-gray-600">|</span>
                       <span className="text-gray-400">GC:</span>
-                      <strong className="text-white font-mono">{activeCons.gc_content !== undefined ? activeCons.gc_content : 0}%</strong>
+                      <strong className="text-white font-mono text-xs">{activeCons.gc_content !== undefined ? activeCons.gc_content : 0}%</strong>
                     </div>
                   </div>
 
