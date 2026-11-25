@@ -48,7 +48,7 @@ An integrated suite for genomic epidemiology of viral pathogens. It combines a m
 ## Setup and Installation
 
 ### 1. Pre-requisites
-- **Nextflow** (v26+)
+- **Nextflow** (&ge; 23.04; tested on v26+)
 - **Conda** or **Docker**
 - **Node.js** (v18+) and **npm**
 

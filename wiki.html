@@ -1180,7 +1180,7 @@ npm run dev
           <div class="builder-grid">
             <div class="builder-control">
               <label class="builder-label">Sequencing Platform</label>
-              <select id="builderPlatform" class="builder-select" onchange="updateBuilderCommand()">
+              <select id="builderPlatform" class="builder-select" onchange="handleBuilderPlatformChange()">
                 <option value="illumina" selected>Illumina (Paired-End)</option>
                 <option value="ont">Oxford Nanopore (Single-End)</option>
               </select>
@@ -1193,12 +1193,36 @@ npm run dev
               </select>
             </div>
             <div class="builder-control">
+              <label class="builder-label">Execution Profile</label>
+              <select id="builderProfile" class="builder-select" onchange="updateBuilderCommand()">
+                <option value="conda" selected>Conda (environment.yml)</option>
+                <option value="docker">Docker (Dockerfile)</option>
+                <option value="singularity">Singularity / Apptainer</option>
+              </select>
+            </div>
+            <div class="builder-control">
               <label class="builder-label">Min Depth (Coverage)</label>
-              <input type="number" id="builderMinCov" class="builder-input" value="100" oninput="updateBuilderCommand()">
+              <input type="number" id="builderMinCov" class="builder-input" value="10" min="0" oninput="updateBuilderCommand()">
             </div>
             <div class="builder-control">
               <label class="builder-label">Min Allele Frequency</label>
-              <input type="number" id="builderMinFreq" class="builder-input" step="0.05" value="0.20" oninput="updateBuilderCommand()">
+              <input type="number" id="builderMinFreq" class="builder-input" step="0.05" min="0" max="1" value="0.20" oninput="updateBuilderCommand()">
+            </div>
+            <div class="builder-control">
+              <label class="builder-label">Min Mapping Qual (MAPQ)</label>
+              <input type="number" id="builderMinMapQ" class="builder-input" value="20" min="0" oninput="updateBuilderCommand()">
+            </div>
+            <div class="builder-control">
+              <label class="builder-label">Min Base Qual (BaseQ)</label>
+              <input type="number" id="builderMinBaseQ" class="builder-input" value="20" min="0" oninput="updateBuilderCommand()">
+            </div>
+            <div class="builder-control">
+              <label class="builder-label">QC PASS Depth / Breadth% / Max N%</label>
+              <div style="display: flex; gap: 6px;">
+                <input type="number" id="builderQcDepth" class="builder-input" style="width:33%;" value="100" min="0" title="--qc_pass_depth" oninput="updateBuilderCommand()">
+                <input type="number" id="builderQcBreadth" class="builder-input" style="width:33%;" value="95.0" step="0.5" min="0" max="100" title="--qc_pass_breadth" oninput="updateBuilderCommand()">
+                <input type="number" id="builderQcMaxN" class="builder-input" style="width:34%;" value="5.0" step="0.5" min="0" max="100" title="--qc_pass_max_n" oninput="updateBuilderCommand()">
+              </div>
             </div>
           </div>
 
@@ -1209,11 +1233,15 @@ npm run dev
             </label>
             <label class="builder-checkbox">
               <input type="checkbox" id="builderPrimers" checked onchange="updateBuilderCommand()">
-              Include Primer BED Trimming
+              Include Primer BED Trimming (<code>--primer_bed</code>)
             </label>
             <label class="builder-checkbox">
               <input type="checkbox" id="builderGff" checked onchange="updateBuilderCommand()">
-              Include GFF3 Annotation
+              Include GFF3 Annotation (<code>--gff</code>)
+            </label>
+            <label class="builder-checkbox" id="builderOntAdapterWrap" style="display:none;">
+              <input type="checkbox" id="builderOntTrimAdapters" onchange="updateBuilderCommand()">
+              Enable ONT Auto-Adapter Trimming (<code>--ont_trim_adapters</code>)
             </label>
           </div>
 
@@ -1486,13 +1514,10 @@ NTC,2026-03-15,Sydney,Control,None</code></pre>
     │   ├── [sample_id]_trimmed.bam <-- Primer-clipped, coordinate-sorted BAM
     │   └── [sample_id]_trimmed.bam.bai
     ├── variants/
-    │   ├── [sample_id]_raw.bcf     <-- Unfiltered candidate variants
-    │   ├── [sample_id].vcf         <-- Filtered VCF variant file
-    │   ├── [sample_id].vcf.gz      <-- Compressed and tabix-indexed VCF
-    │   └── [sample_id].vcf.gz.tbi
+    │   ├── [sample_id].vcf           <-- Reported VCF (with VAF & CONSENSUS/SUBCLONAL tags)
+    │   └── [sample_id]_consensus.vcf <-- Decoupled consensus-eligible VCF
     └── consensus/
-        ├── [sample_id]_consensus.fasta <-- Assembled FASTA genome
-        └── low_coverage_mask.bed   <-- BED coordinates masked with N</code></pre>
+        └── [sample_id]_consensus.fasta <-- Assembled FASTA genome (low-depth masked with N)</code></pre>
         </div>
       </section>
 
@@ -1721,54 +1746,74 @@ NTC,2026-03-15,Sydney,Control,None</code></pre>
     })();
 
     // Interactive Command Builder Logic
+    function handleBuilderPlatformChange() {
+      const platform = document.getElementById('builderPlatform').value;
+      document.getElementById('builderMinCov').value = platform === 'ont' ? '50' : '10';
+      document.getElementById('builderMinFreq').value = platform === 'ont' ? '0.50' : '0.20';
+      document.getElementById('builderMinBaseQ').value = platform === 'ont' ? '15' : '20';
+      const ontWrap = document.getElementById('builderOntAdapterWrap');
+      if (ontWrap) {
+        ontWrap.style.display = platform === 'ont' ? 'flex' : 'none';
+      }
+      updateBuilderCommand();
+    }
+
     function updateBuilderCommand() {
       const platform = document.getElementById('builderPlatform').value;
       const inputMode = document.getElementById('builderInputMode').value;
-      const minCov = document.getElementById('builderMinCov').value || '10';
-      const minFreq = document.getElementById('builderMinFreq').value || '0.2';
+      const profile = document.getElementById('builderProfile').value || 'conda';
+      const minCov = document.getElementById('builderMinCov').value || (platform === 'ont' ? '50' : '10');
+      const minFreq = document.getElementById('builderMinFreq').value || (platform === 'ont' ? '0.5' : '0.2');
+      const minMapQ = document.getElementById('builderMinMapQ').value || '20';
+      const minBaseQ = document.getElementById('builderMinBaseQ').value || (platform === 'ont' ? '15' : '20');
+      const qcDepth = document.getElementById('builderQcDepth').value || '100';
+      const qcBreadth = document.getElementById('builderQcBreadth').value || '95.0';
+      const qcMaxN = document.getElementById('builderQcMaxN').value || '5.0';
       const useIupac = document.getElementById('builderIupac').checked;
       const hasPrimers = document.getElementById('builderPrimers').checked;
       const hasGff = document.getElementById('builderGff').checked;
+      const ontTrimAdapters = document.getElementById('builderOntTrimAdapters').checked;
 
-      let cmd = `nextflow run pipeline/main.nf \
-  --platform ${platform}`;
+      const lines = [
+        'nextflow run pipeline/main.nf',
+        `--platform ${platform}`
+      ];
 
       if (inputMode === 'samplesheet') {
-        cmd += ` \
-  --sample_sheet samplesheet.csv`;
+        lines.push('--sample_sheet samplesheet.csv');
       } else {
-        cmd += ` \
-  --reads "${platform === 'illumina' ? 'raw_data/*_R{1,2}.fastq.gz' : 'raw_data/*.fastq.gz'}"`;
+        lines.push(`--reads "${platform === 'illumina' ? 'raw_data/*_R{1,2}.fastq.gz' : 'raw_data/*.fastq.gz'}"`);
       }
 
-      cmd += ` \
-  --reference reference/genome.fasta`;
+      lines.push('--reference reference/genome.fasta');
 
       if (hasGff) {
-        cmd += ` \
-  --gff reference/annotations.gff3`;
+        lines.push('--gff reference/annotations.gff3');
       }
       if (hasPrimers) {
-        cmd += ` \
-  --primer_bed reference/primers.bed`;
+        lines.push('--primer_bed reference/primers.bed');
       }
 
-      cmd += ` \
-  --min_coverage ${minCov}`;
-      cmd += ` \
-  --min_freq ${minFreq}`;
+      lines.push(`--min_coverage ${minCov}`);
+      lines.push(`--min_freq ${minFreq}`);
+      lines.push(`--min_map_qual ${minMapQ}`);
+      lines.push(`--min_base_qual ${minBaseQ}`);
+      lines.push(`--qc_pass_depth ${qcDepth}`);
+      lines.push(`--qc_pass_breadth ${qcBreadth}`);
+      lines.push(`--qc_pass_max_n ${qcMaxN}`);
 
+      if (platform === 'ont' && ontTrimAdapters) {
+        lines.push('--ont_trim_adapters true');
+      }
       if (useIupac) {
-        cmd += ` \
-  --use_iupac`;
+        lines.push('--use_iupac');
       }
 
-      cmd += ` \
-  --outdir results/${platform}_run \
-  -profile conda`;
+      lines.push(`--outdir results/${platform}_run`);
+      lines.push(`-profile ${profile}`);
 
       const codeEl = document.getElementById('builderGeneratedCommand');
-      if (codeEl) codeEl.innerText = cmd;
+      if (codeEl) codeEl.textContent = lines.join(' \\\n  ');
     }
 
     // Initialize command builder
