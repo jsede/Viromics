@@ -2,6 +2,9 @@
 
 An integrated suite for genomic epidemiology of viral pathogens. It combines a modular Nextflow (DSL2) analytical pipeline for amplicon-based whole-genome sequencing (WGS) with a client-side React web dashboard to explore quality control (QC), genome coverage depth, variant metrics, and evolutionary relationships.
 
+> [!TIP]
+> **Interactive Documentation Wiki**: Open [`wiki.html`](wiki.html) in your browser (or run `open wiki.html` on macOS) for an interactive technical wiki with parameter builders, curated frameshift model guides, tool details, and troubleshooting FAQs!
+
 ---
 
 ## Key Features
@@ -30,6 +33,7 @@ An integrated suite for genomic epidemiology of viral pathogens. It combines a m
   - `nextflow.config`: Parameter sets, resources, and conda environment profiles.
   - `modules/`: Decoupled Nextflow process definitions.
   - `bin/parse_metrics.py`: Metric aggregator, variant translator, and distance matrix calculator.
+- `wiki.html`: Standalone interactive technical documentation wiki and manual.
 - `dashboard/`: A client-side web application (React, Vite, Tailwind CSS).
 - `scripts/`: Development and testing tools.
   - `generate_mock_data.py`: Synthetic multi-strain RSV-A/B dataset generator.
@@ -135,19 +139,19 @@ results/
 
 ## Running the SARS-CoV-2 Illumina Example Dataset
 
-The repository includes a ready-to-run SARS-CoV-2 Illumina paired-end amplicon sequencing dataset inside the `example_data/` directory, showcasing the use of samplesheet CSV inputs and metadata annotations.
+The repository includes a ready-to-run SARS-CoV-2 Illumina paired-end amplicon sequencing dataset inside the `example_data/illumina_SARS2/` directory, showcasing the use of samplesheet CSV inputs and metadata annotations.
 
 To run the pipeline on this example dataset under the Conda profile, execute:
 ```bash
 nextflow run pipeline/main.nf \
   --platform illumina \
-  --sample_sheet example_data/samplesheet.csv \
-  --reference example_data/refs/ref.SARS-CoV-2.fasta \
-  --gff example_data/refs/ref.SARS-CoV-2.gff \
-  --primer_bed example_data/refs/primer_scheme.SARS-CoV-2-Eden.bed \
-  --amplicons_bed example_data/refs/amplicons.SARS-CoV-2-Eden.bed \
-  --metadata example_data/metadata.csv \
-  --outdir example_data/results \
+  --sample_sheet example_data/illumina_SARS2/samplesheet.csv \
+  --reference example_data/illumina_SARS2/refs/ref.SARS-CoV-2.fasta \
+  --gff example_data/illumina_SARS2/refs/ref.SARS-CoV-2.gff \
+  --primer_bed example_data/illumina_SARS2/refs/primer_scheme.SARS-CoV-2-Eden.bed \
+  --amplicons_bed example_data/illumina_SARS2/refs/amplicons.SARS-CoV-2-Eden.bed \
+  --metadata example_data/illumina_SARS2/metadata.csv \
+  --outdir example_data/illumina_SARS2/results \
   -profile conda
 ```
 
@@ -155,7 +159,7 @@ This execution:
 1. Parses the samplesheet `samplesheet.csv` to map the paired-end fastq files for the negative control (`NTC`) and three clinical samples (`Sample01`, `Sample02`, `Sample03`).
 2. Trims PCR primers dynamically and calls variants against the SARS-CoV-2 reference sequence.
 3. Incorporates collection dates, geographic locations, and specimen host metadata from `metadata.csv`.
-4. Runs the Python schema validator and outputs the consolidated run report at `example_data/results/viromics_run_report.json`. Drag and drop this output report directly into the React dashboard to analyze the results!
+4. Runs the Python schema validator and outputs the consolidated run report at `example_data/illumina_SARS2/results/viromics_run_report.json`. Drag and drop this output report directly into the React dashboard to analyze the results!
 
 ---
 

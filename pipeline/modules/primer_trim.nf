@@ -12,8 +12,8 @@ process PRIMER_TRIM {
     script:
     if (primer_bed) {
         """
-        # Remove primers using samtools ampliconclip
-        samtools ampliconclip -@ ${task.cpus} -b ${primer_bed} ${raw_bam} | \\
+        # Remove primers using samtools ampliconclip clipping both ends
+        samtools ampliconclip --both-ends -@ ${task.cpus} -b ${primer_bed} ${raw_bam} | \\
             samtools sort -@ ${task.cpus} -o ${sample_id}_trimmed.bam -
         samtools index ${sample_id}_trimmed.bam
         """

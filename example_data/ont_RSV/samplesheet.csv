@@ -1,0 +1,6 @@
+sample_id,platform,fastq_1
+Sample13,ont,example_data/ont_RSV/input/Sample13.fastq.gz
+Sample29,ont,example_data/ont_RSV/input/Sample29.fastq.gz
+Sample35,ont,example_data/ont_RSV/input/Sample35.fastq.gz
+Sample40,ont,example_data/ont_RSV/input/Sample40.fastq.gz
+Sample45,ont,example_data/ont_RSV/input/Sample45.fastq.gz

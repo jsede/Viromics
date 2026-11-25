@@ -2,8 +2,45 @@ import React, { useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Brush, ReferenceLine } from 'recharts';
 import { ZoomIn, ZoomOut, AlertCircle } from 'lucide-react';
 
+const CustomTooltip = ({ active, payload, label, minCoverageThreshold = 10 }) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    const depth = data.depth;
+    
+    // Determine dynamic quality class
+    let qualityLabel = 'FAIL';
+    let qualityColor = 'text-brand-rose';
+    if (depth >= minCoverageThreshold) {
+      qualityLabel = 'PASS';
+      qualityColor = 'text-brand-emerald';
+    } else if (depth >= Math.max(1, Math.round(minCoverageThreshold * 0.25))) {
+      qualityLabel = 'WARN';
+      qualityColor = 'text-brand-amber';
+    }
+    
+    return (
+      <div className="bg-slate-900 border border-slate-700/80 p-3 rounded-xl shadow-xl text-left select-text font-mono leading-relaxed max-w-xs chart-tooltip">
+        <div className="font-bold text-white border-b border-slate-800 pb-1.5 mb-1.5 text-[10px] uppercase tracking-wider flex justify-between items-center gap-4">
+          <span>Genomic Position</span>
+          <span className={`text-[9px] px-1.5 py-0.5 rounded bg-slate-800 font-bold ${qualityColor}`}>
+            {qualityLabel}
+          </span>
+        </div>
+        <div className="space-y-1 text-[11px]">
+          <p className="text-slate-300">
+            Position: <span className="text-white font-bold">{label ? label.toLocaleString() : 0} bp</span>
+          </p>
+          <p className="text-slate-300">
+            Depth: <span className={`${qualityColor} font-bold`}>{depth.toLocaleString()}x</span>
+          </p>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
 export default function CoverageChart({ coverageData, minCoverageThreshold = 10 }) {
-  const [zoomRange, setZoomRange] = useState({ start: 0, end: coverageData.length - 1 });
   const [selectedYScale, setSelectedYScale] = useState('log'); // 'linear' or 'log'
 
   if (!coverageData || coverageData.length === 0) {
@@ -147,18 +184,7 @@ export default function CoverageChart({ coverageData, minCoverageThreshold = 10 
               stroke="rgba(156, 163, 175, 0.5)"
               tick={{ fill: '#9ca3af', fontSize: 10 }}
             />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: 'rgba(22, 29, 48, 0.95)',
-                borderColor: 'rgba(36, 47, 77, 0.8)',
-                borderRadius: '12px',
-                color: '#fff',
-                fontFamily: 'Fira Code',
-                fontSize: '11px'
-              }}
-              formatter={formatTooltip}
-              labelFormatter={(label) => `Genomic Position: ${label.toLocaleString()} bp`}
-            />
+            <Tooltip content={<CustomTooltip minCoverageThreshold={minCoverageThreshold} />} />
             <ReferenceLine 
               y={selectedYScale === 'log' ? Math.log10(minCoverageThreshold) : minCoverageThreshold} 
               stroke="#f43f5e" 

@@ -1,0 +1,1721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Viromics Knowledge Base & Technical Wiki</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-body: #0b0f19;
+      --bg-surface: #111827;
+      --bg-surface-elevated: #1f2937;
+      --bg-glass: rgba(17, 24, 39, 0.75);
+      --border-color: #1f2937;
+      --border-focus: #14b8a6;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      
+      --brand-teal: #14b8a6;
+      --brand-teal-dim: rgba(20, 184, 166, 0.12);
+      --brand-violet: #8b5cf6;
+      --brand-violet-dim: rgba(139, 92, 246, 0.12);
+      --brand-emerald: #10b981;
+      --brand-emerald-dim: rgba(16, 185, 129, 0.12);
+      --brand-amber: #f59e0b;
+      --brand-amber-dim: rgba(245, 158, 11, 0.12);
+      --brand-rose: #f43f5e;
+      --brand-rose-dim: rgba(244, 63, 94, 0.12);
+      --brand-cyan: #06b6d4;
+
+      --sidebar-width: 290px;
+      --header-height: 68px;
+      --code-bg: #0d1117;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-heading: 'Outfit', sans-serif;
+      --font-mono: 'Fira Code', monospace;
+    }
+
+    [data-theme="light"] {
+      --bg-body: #f8fafc;
+      --bg-surface: #ffffff;
+      --bg-surface-elevated: #f1f5f9;
+      --bg-glass: rgba(255, 255, 255, 0.85);
+      --border-color: #e2e8f0;
+      --border-focus: #0d9488;
+      --text-main: #0f172a;
+      --text-muted: #475569;
+      --text-dim: #94a3b8;
+      --brand-teal-dim: rgba(13, 148, 136, 0.12);
+      --code-bg: #f8fafc;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg-body);
+      color: var(--text-main);
+      line-height: 1.65;
+      font-size: 15px;
+      overflow-x: hidden;
+      scroll-behavior: smooth;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--bg-body);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #374151;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #4b5563;
+    }
+
+    /* Layout */
+    .app-header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: var(--header-height);
+      background: var(--bg-glass);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border-color);
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 2rem;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: inherit;
+    }
+    .brand-icon {
+      width: 38px;
+      height: 38px;
+      background: linear-gradient(135deg, var(--brand-teal), var(--brand-violet));
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #0b0f19;
+      font-weight: 800;
+      font-size: 20px;
+      box-shadow: 0 0 20px rgba(20, 184, 166, 0.35);
+    }
+    .brand-title {
+      font-family: var(--font-heading);
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .brand-badge {
+      font-size: 0.68rem;
+      padding: 2px 7px;
+      border-radius: 6px;
+      background: var(--brand-teal-dim);
+      color: var(--brand-teal);
+      border: 1px solid rgba(20, 184, 166, 0.3);
+      font-family: var(--font-mono);
+      font-weight: 600;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .search-box {
+      position: relative;
+      width: 280px;
+    }
+    .search-input {
+      width: 100%;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 8px 12px 8px 36px;
+      color: var(--text-main);
+      font-size: 0.85rem;
+      outline: none;
+      transition: all 0.2s;
+    }
+    .search-input:focus {
+      border-color: var(--brand-teal);
+      box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.2);
+    }
+    .search-icon {
+      position: absolute;
+      left: 11px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-dim);
+      font-size: 14px;
+      pointer-events: none;
+    }
+
+    .theme-toggle-btn {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      border-radius: 10px;
+      width: 38px;
+      height: 38px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+    .theme-toggle-btn:hover {
+      color: var(--text-main);
+      border-color: var(--brand-teal);
+    }
+
+    /* Container & Sidebar */
+    .layout-wrapper {
+      display: flex;
+      margin-top: var(--header-height);
+      min-height: calc(100vh - var(--header-height));
+    }
+
+    .sidebar {
+      width: var(--sidebar-width);
+      position: fixed;
+      top: var(--header-height);
+      bottom: 0;
+      left: 0;
+      background: var(--bg-surface);
+      border-right: 1px solid var(--border-color);
+      overflow-y: auto;
+      padding: 1.5rem 1rem 3rem 1rem;
+      z-index: 40;
+    }
+
+    .nav-group-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-dim);
+      margin: 1.5rem 0 0.5rem 0.5rem;
+      font-family: var(--font-heading);
+    }
+    .nav-group-title:first-child {
+      margin-top: 0.2rem;
+    }
+
+    .nav-list {
+      list-style: none;
+    }
+    .nav-item {
+      margin-bottom: 2px;
+    }
+    .nav-link {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 12px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      text-decoration: none;
+      border-radius: 8px;
+      transition: all 0.15s ease;
+      font-weight: 500;
+    }
+    .nav-link:hover {
+      color: var(--text-main);
+      background: var(--bg-surface-elevated);
+    }
+    .nav-link.active {
+      color: var(--brand-teal);
+      background: var(--brand-teal-dim);
+      font-weight: 600;
+    }
+    .nav-link .bullet {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--text-dim);
+      transition: all 0.15s;
+    }
+    .nav-link.active .bullet {
+      background: var(--brand-teal);
+      box-shadow: 0 0 8px var(--brand-teal);
+    }
+
+    /* Content Area */
+    .main-content {
+      margin-left: var(--sidebar-width);
+      flex: 1;
+      padding: 2.5rem 3.5rem 6rem 3.5rem;
+      max-width: 1200px;
+    }
+
+    /* Typography & Sections */
+    h1, h2, h3, h4 {
+      font-family: var(--font-heading);
+      color: var(--text-main);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    h1 {
+      font-size: 2.4rem;
+      margin-bottom: 0.75rem;
+      line-height: 1.2;
+    }
+    h2 {
+      font-size: 1.65rem;
+      margin-top: 3.5rem;
+      margin-bottom: 1.2rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    h2:first-of-type {
+      margin-top: 1.5rem;
+    }
+    h3 {
+      font-size: 1.2rem;
+      margin-top: 2rem;
+      margin-bottom: 0.75rem;
+      color: #38bdf8;
+    }
+    p {
+      margin-bottom: 1.2rem;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+    ul, ol {
+      margin: 0 0 1.5rem 1.5rem;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+    li {
+      margin-bottom: 0.4rem;
+    }
+
+    strong {
+      color: var(--text-main);
+      font-weight: 600;
+    }
+
+    /* Hero Banner */
+    .hero-banner {
+      background: linear-gradient(135deg, rgba(20, 184, 166, 0.12), rgba(139, 92, 246, 0.12));
+      border: 1px solid rgba(20, 184, 166, 0.25);
+      border-radius: 20px;
+      padding: 2.5rem;
+      margin-bottom: 3rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero-banner::after {
+      content: '';
+      position: absolute;
+      top: -50%;
+      right: -20%;
+      width: 350px;
+      height: 350px;
+      background: radial-gradient(circle, rgba(20, 184, 166, 0.2) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-banner p {
+      font-size: 1.1rem;
+      color: #cbd5e1;
+      max-width: 850px;
+      margin-bottom: 1.5rem;
+    }
+    .hero-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .hero-tag {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--brand-teal);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Cards & Grids */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.25rem;
+      margin: 1.5rem 0 2rem 0;
+    }
+    .card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 1.25rem;
+      transition: transform 0.15s, border-color 0.15s;
+    }
+    .card:hover {
+      border-color: var(--brand-teal);
+      transform: translateY(-2px);
+    }
+    .card-title {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card p {
+      font-size: 0.85rem;
+      margin-bottom: 0;
+      color: var(--text-muted);
+    }
+
+    /* Callout Alerts */
+    .callout {
+      border-left: 4px solid;
+      border-radius: 0 12px 12px 0;
+      padding: 1rem 1.25rem;
+      margin: 1.5rem 0;
+      background: var(--bg-surface);
+      font-size: 0.9rem;
+    }
+    .callout-info {
+      border-color: var(--brand-teal);
+      background: var(--brand-teal-dim);
+    }
+    .callout-warning {
+      border-color: var(--brand-amber);
+      background: var(--brand-amber-dim);
+    }
+    .callout-danger {
+      border-color: var(--brand-rose);
+      background: var(--brand-rose-dim);
+    }
+    .callout-success {
+      border-color: var(--brand-emerald);
+      background: var(--brand-emerald-dim);
+    }
+    .callout-title {
+      font-weight: 700;
+      margin-bottom: 0.35rem;
+      font-family: var(--font-heading);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .callout-info .callout-title { color: var(--brand-teal); }
+    .callout-warning .callout-title { color: var(--brand-amber); }
+    .callout-danger .callout-title { color: var(--brand-rose); }
+    .callout-success .callout-title { color: var(--brand-emerald); }
+
+    /* Code Blocks */
+    .code-container {
+      position: relative;
+      margin: 1.25rem 0;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--border-color);
+      background: var(--code-bg);
+    }
+    .code-header {
+      background: rgba(255, 255, 255, 0.03);
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+    }
+    pre {
+      padding: 1rem 1.25rem;
+      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      line-height: 1.5;
+      color: #e2e8f0;
+    }
+    code {
+      font-family: var(--font-mono);
+      font-size: 0.85em;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.08);
+      color: #38bdf8;
+    }
+    pre code {
+      background: transparent;
+      padding: 0;
+      color: inherit;
+    }
+    .copy-btn {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.72rem;
+      font-family: var(--font-sans);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s;
+    }
+    .copy-btn:hover {
+      color: var(--brand-teal);
+      border-color: var(--brand-teal);
+    }
+
+    /* Tables */
+    .table-wrapper {
+      width: 100%;
+      overflow-x: auto;
+      margin: 1.5rem 0;
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+      text-align: left;
+    }
+    th {
+      background: var(--bg-surface-elevated);
+      color: var(--text-main);
+      padding: 10px 14px;
+      font-weight: 600;
+      font-family: var(--font-heading);
+      border-bottom: 1px solid var(--border-color);
+    }
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border-color);
+      color: var(--text-muted);
+      vertical-align: top;
+    }
+    tr:last-child td {
+      border-bottom: none;
+    }
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    /* Workflow Diagram */
+    .flow-diagram {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 2rem;
+      margin: 2rem 0;
+      text-align: center;
+    }
+    .flow-step {
+      display: inline-block;
+      background: var(--bg-surface-elevated);
+      border: 1px solid rgba(20, 184, 166, 0.4);
+      padding: 12px 18px;
+      border-radius: 10px;
+      margin: 6px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+    .flow-arrow {
+      display: inline-block;
+      color: var(--brand-teal);
+      font-weight: bold;
+      margin: 0 4px;
+    }
+
+    /* Interactive Command Builder */
+    .builder-panel {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 1.5rem;
+      margin: 2rem 0;
+    }
+    .builder-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+    }
+    .builder-control {
+      display: flex;
+      flex-col: column;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .builder-label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .builder-select, .builder-input {
+      background: var(--bg-body);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      outline: none;
+    }
+    .builder-select:focus, .builder-input:focus {
+      border-color: var(--brand-teal);
+    }
+    .builder-checkbox {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      color: var(--text-muted);
+      margin-top: 10px;
+    }
+
+    /* Tabs */
+    .tab-group {
+      margin: 1.5rem 0;
+    }
+    .tab-buttons {
+      display: flex;
+      gap: 4px;
+      border-bottom: 1px solid var(--border-color);
+      margin-bottom: 1rem;
+    }
+    .tab-btn {
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--text-dim);
+      font-family: var(--font-heading);
+      font-weight: 600;
+      font-size: 0.88rem;
+      padding: 8px 16px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .tab-btn:hover {
+      color: var(--text-main);
+    }
+    .tab-btn.active {
+      color: var(--brand-teal);
+      border-bottom-color: var(--brand-teal);
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Accordion FAQ */
+    .accordion-item {
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      margin-bottom: 8px;
+      background: var(--bg-surface);
+      overflow: hidden;
+    }
+    .accordion-header {
+      padding: 14px 18px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      user-select: none;
+    }
+    .accordion-header:hover {
+      color: var(--brand-teal);
+    }
+    .accordion-body {
+      padding: 0 18px 14px 18px;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      display: none;
+      border-top: 1px solid var(--border-color);
+      padding-top: 12px;
+    }
+    .accordion-item.open .accordion-body {
+      display: block;
+    }
+    .accordion-item.open .accordion-icon {
+      transform: rotate(180deg);
+    }
+    .accordion-icon {
+      transition: transform 0.2s;
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border-color);
+      padding: 2.5rem 0 1rem 0;
+      margin-top: 4rem;
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--text-dim);
+    }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      .sidebar {
+        display: none;
+      }
+      .main-content {
+        margin-left: 0;
+        padding: 1.5rem;
+      }
+      .app-header {
+        padding: 0 1rem;
+      }
+      .search-box {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <a href="#overview" class="brand-group">
+      <div class="brand-icon">V</div>
+      <div class="brand-title">
+        VIROMICS
+        <span class="brand-badge">WIKI DOCS</span>
+      </div>
+    </a>
+
+    <div class="header-actions">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="wikiSearchInput" class="search-input" placeholder="Search parameters, tools, models..." oninput="handleWikiSearch(this.value)">
+      </div>
+      <button class="theme-toggle-btn" id="themeToggleBtn" title="Toggle light/dark theme" onclick="toggleTheme()">
+        🌙
+      </button>
+      <a href="https://github.com" target="_blank" class="copy-btn" style="text-decoration:none;">
+        GitHub ↗
+      </a>
+    </div>
+  </header>
+
+  <div class="layout-wrapper">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <nav>
+        <div class="nav-group-title">Getting Started</div>
+        <ul class="nav-list">
+          <li class="nav-item"><a href="#overview" class="nav-link active"><span class="bullet"></span> Overview & Architecture</a></li>
+          <li class="nav-item"><a href="#installation" class="nav-link"><span class="bullet"></span> Installation & Environment</a></li>
+          <li class="nav-item"><a href="#quickstart" class="nav-link"><span class="bullet"></span> Quickstart Guide</a></li>
+        </ul>
+
+        <div class="nav-group-title">Pipeline Execution</div>
+        <ul class="nav-list">
+          <li class="nav-item"><a href="#cli-usage" class="nav-link"><span class="bullet"></span> CLI Parameters</a></li>
+          <li class="nav-item"><a href="#builder" class="nav-link"><span class="bullet"></span> Command Builder</a></li>
+          <li class="nav-item"><a href="#samplesheets" class="nav-link"><span class="bullet"></span> Samplesheet & Metadata</a></li>
+          <li class="nav-item"><a href="#multi-ref" class="nav-link"><span class="bullet"></span> Multi-Strain / Co-Infection</a></li>
+        </ul>
+
+        <div class="nav-group-title">Analytical Engine</div>
+        <ul class="nav-list">
+          <li class="nav-item"><a href="#tools-modules" class="nav-link"><span class="bullet"></span> Pipeline Tools & Steps</a></li>
+          <li class="nav-item"><a href="#scientific-assumptions" class="nav-link"><span class="bullet"></span> Scientific Assumptions</a></li>
+          <li class="nav-item"><a href="#curated-models" class="nav-link"><span class="bullet"></span> Curated Frameshift Models</a></li>
+          <li class="nav-item"><a href="#snp-distance" class="nav-link"><span class="bullet"></span> Distance Matrix & UPGMA</a></li>
+        </ul>
+
+        <div class="nav-group-title">Outputs & Visualization</div>
+        <ul class="nav-list">
+          <li class="nav-item"><a href="#expected-outputs" class="nav-link"><span class="bullet"></span> Expected Outputs</a></li>
+          <li class="nav-item"><a href="#json-schema" class="nav-link"><span class="bullet"></span> Run Report JSON Schema</a></li>
+          <li class="nav-item"><a href="#dashboard-guide" class="nav-link"><span class="bullet"></span> Web Dashboard Guide</a></li>
+        </ul>
+
+        <div class="nav-group-title">Support</div>
+        <ul class="nav-list">
+          <li class="nav-item"><a href="#faq" class="nav-link"><span class="bullet"></span> Troubleshooting & FAQs</a></li>
+        </ul>
+      </nav>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+
+      <!-- Hero Header -->
+      <section class="hero-banner" id="overview">
+        <h1>Viromics Technical Wiki</h1>
+        <p>
+          Viromics is an end-to-end, scientifically validated computational platform for amplicon-based viral whole-genome sequencing (WGS) and genomic epidemiology. It unites a high-throughput <strong>Nextflow DSL2</strong> workflow with an interactive, zero-backend <strong>React 18</strong> client-side analytics dashboard.
+        </p>
+        <div class="hero-tags">
+          <span class="hero-tag">🧬 Nextflow DSL2</span>
+          <span class="hero-tag">🔬 Illumina & Oxford Nanopore</span>
+          <span class="hero-tag">⚡ Zero-Database Dashboard</span>
+          <span class="hero-tag">📊 UPGMA SNP Tree</span>
+          <span class="hero-tag">📑 Programmed Frameshift Engine</span>
+        </div>
+      </section>
+
+      <!-- Section: Overview & Architecture -->
+      <section id="architecture">
+        <h2>1. Architecture & Design Principles</h2>
+        <p>
+          Viral amplicon sequencing presents unique bioinformatics challenges: overlapping PCR primer schemes, severe depth gradients across amplicons, low-frequency subclonal variants, atypical biological mechanisms like programmed -1 ribosomal frameshifts (e.g. SARS-CoV-2 ORF1ab), and potential multi-strain viral co-infections.
+        </p>
+
+        <div class="card-grid">
+          <div class="card">
+            <div class="card-title">🚀 Modular Pipeline (Nextflow DSL2)</div>
+            <p>Decoupled stages with staged reference indexing, rigorous quality filtering, amplicon primer clipping, and haploid variant calling with IUPAC support.</p>
+          </div>
+          <div class="card">
+            <div class="card-title">🖥️ Client-Side Web Dashboard</div>
+            <p>100% browser-based React 18 application requiring no database, API servers, or external cloud services. Consumes a single structured JSON report.</p>
+          </div>
+          <div class="card">
+            <div class="card-title">🛡️ Fail-Closed Biology</div>
+            <p>Never guesses amino-acid changes for unsupported translation exceptions. Programmed frameshifts require explicit curated interval models.</p>
+          </div>
+          <div class="card">
+            <div class="card-title">🌐 Multi-Reference Co-Detection</div>
+            <p>Simultaneously aligns and profiles multiplexed samples against multi-contig references (e.g. RSV-A and RSV-B) with automatic co-infection classification.</p>
+          </div>
+        </div>
+
+        <div class="flow-diagram">
+          <h4 style="margin-bottom: 1.25rem; color: var(--text-main);">Pipeline Process Flow (DSL2 DAG)</h4>
+          <div>
+            <span class="flow-step">Raw FASTQ (Illumina/ONT)</span>
+            <span class="flow-arrow">➔</span>
+            <span class="flow-step">FASTQ_QC (BBDuk + fastp)</span>
+            <span class="flow-arrow">➔</span>
+            <span class="flow-step">INDEX_REFERENCE & ALIGN_READS (BWA/Minimap2)</span>
+            <span class="flow-arrow">➔</span>
+            <span class="flow-step">PRIMER_TRIM (ampliconclip)</span>
+          </div>
+          <div style="margin-top: 1rem;">
+            <span class="flow-arrow">↳</span>
+            <span class="flow-step">VARIANT_CALL (mpileup -d 8000 -L 8000)</span>
+            <span class="flow-arrow">➔</span>
+            <span class="flow-step">CONSENSUS_GEN (depth -aa -J + bcftools)</span>
+            <span class="flow-arrow">➔</span>
+            <span class="flow-step">AGGREGATE_METRICS (parse_metrics.py)</span>
+            <span class="flow-arrow">➔</span>
+            <span class="flow-step">viromics_run_report.json</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section: Installation & Prerequisites -->
+      <section id="installation">
+        <h2>2. Installation & Prerequisites</h2>
+        <p>Viromics requires three foundational runtime layers: Nextflow for workflow execution, a container or conda manager for bioinformatics tools, and Node.js for compiling the dashboard.</p>
+
+        <h3>Software Requirements</h3>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Component</th>
+                <th>Minimum Version</th>
+                <th>Recommended</th>
+                <th>Purpose</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Nextflow</strong></td>
+                <td>&ge; 23.04 (DSL2)</td>
+                <td>24.10+</td>
+                <td>Core pipeline orchestration and task scheduling</td>
+              </tr>
+              <tr>
+                <td><strong>Conda / Mamba</strong></td>
+                <td>Conda 4.12+</td>
+                <td>Micromamba / Mamba</td>
+                <td>Automatic bioinformatics package environment management</td>
+              </tr>
+              <tr>
+                <td><strong>Docker / Singularity</strong></td>
+                <td>Docker 20+</td>
+                <td>Optional alternative</td>
+                <td>Containerized execution mode without Conda</td>
+              </tr>
+              <tr>
+                <td><strong>Node.js & npm</strong></td>
+                <td>Node 18.x+</td>
+                <td>Node 20 LTS</td>
+                <td>Compiling and building the interactive React web dashboard</td>
+              </tr>
+              <tr>
+                <td><strong>Python</strong></td>
+                <td>Python 3.9+</td>
+                <td>Python 3.11</td>
+                <td>Metric aggregation, curated model parsing, test suites</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>1. Pipeline Environment Setup (Conda / Micromamba)</h3>
+        <p>The pipeline automatically activates required bioconda packages when executed with <code>-profile conda</code>. Alternatively, create an isolated environment with all command-line tools:</p>
+
+        <div class="code-container">
+          <div class="code-header">
+            <span>BASH</span>
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code># Create conda environment with all underlying bioinformatics utilities
+conda create -n viromics -c conda-forge -c bioconda   nextflow fastp bwa minimap2 samtools bcftools ivar bbmap python=3.11
+
+# Activate environment
+conda activate viromics</code></pre>
+        </div>
+
+        <h3>2. Dashboard Compilation</h3>
+        <p>The React web dashboard is located in <code>dashboard/</code>. To compile the production web assets:</p>
+
+        <div class="code-container">
+          <div class="code-header">
+            <span>BASH</span>
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code>cd dashboard
+npm install
+npm run build
+
+# The optimized static bundle is output to dashboard/dist/</code></pre>
+        </div>
+      </section>
+
+      <!-- Section: Quickstart -->
+      <section id="quickstart">
+        <h2>3. Quickstart Guide</h2>
+        <p>Viromics includes a verified Illumina SARS-CoV-2 amplicon sequencing dataset in <code>example_data/illumina_SARS2/</code>. Execute the complete workflow with one command:</p>
+
+        <div class="code-container">
+          <div class="code-header">
+            <span>BASH — Run SARS-CoV-2 Illumina Example</span>
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code>nextflow run pipeline/main.nf   --platform illumina   --sample_sheet example_data/illumina_SARS2/samplesheet.csv   --reference example_data/illumina_SARS2/refs/ref.SARS-CoV-2.fasta   --gff example_data/illumina_SARS2/refs/ref.SARS-CoV-2.gff   --primer_bed example_data/illumina_SARS2/refs/primer_scheme.SARS-CoV-2-Eden.bed   --metadata example_data/illumina_SARS2/metadata.csv   --outdir results/illumina_sars2   -profile conda</code></pre>
+        </div>
+
+        <p>Once finished, launch the dashboard or preview the output report:</p>
+        <div class="code-container">
+          <div class="code-header">
+            <span>BASH — Launch Web Dashboard</span>
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code>cd dashboard
+npm run dev
+# Open http://localhost:5173 and drag results/illumina_sars2/viromics_run_report.json into the UI</code></pre>
+        </div>
+      </section>
+
+      <!-- Section: CLI Usage & Parameters -->
+      <section id="cli-usage">
+        <h2>4. CLI Parameters Reference</h2>
+        <p>All pipeline executions are invoked through <code>pipeline/main.nf</code>. Parameters can be passed on the command line or configured in <code>pipeline/nextflow.config</code>.</p>
+
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Parameter</th>
+                <th>Type</th>
+                <th>Default</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>--platform</code></td>
+                <td>String</td>
+                <td><em>Required</em></td>
+                <td>Sequencing chemistry: <code>illumina</code> or <code>ont</code>. Configures default aligners and filters.</td>
+              </tr>
+              <tr>
+                <td><code>--reads</code></td>
+                <td>String</td>
+                <td><code>null</code></td>
+                <td>Glob pattern matching FastQ files (e.g. <code>"data/*_R{1,2}.fastq.gz"</code> or <code>"data/*.fastq.gz"</code>).</td>
+              </tr>
+              <tr>
+                <td><code>--sample_sheet</code></td>
+                <td>String</td>
+                <td><code>null</code></td>
+                <td>Path to CSV samplesheet. Alternative to <code>--reads</code>.</td>
+              </tr>
+              <tr>
+                <td><code>--reference</code></td>
+                <td>Path</td>
+                <td><em>Required</em></td>
+                <td>Reference FASTA genome. Supports multi-FASTA files for multi-segment or multi-strain panels.</td>
+              </tr>
+              <tr>
+                <td><code>--gff</code></td>
+                <td>Path</td>
+                <td><code>null</code></td>
+                <td>GFF3 annotation file for translating coding effects and mapping amino acid changes.</td>
+              </tr>
+              <tr>
+                <td><code>--primer_bed</code></td>
+                <td>Path</td>
+                <td><code>null</code></td>
+                <td>6-column BED file of primer coordinates for soft-clipping with <code>samtools ampliconclip</code>.</td>
+              </tr>
+              <tr>
+                <td><code>--amplicons_bed</code></td>
+                <td>Path</td>
+                <td><code>null</code></td>
+                <td>Explicit amplicon coordinates BED file. If omitted, inferred automatically from primer pairs.</td>
+              </tr>
+              <tr>
+                <td><code>--metadata</code></td>
+                <td>Path</td>
+                <td><code>null</code></td>
+                <td>Optional CSV mapping <code>sample_id</code> to epidemiological metadata (host, date, location).</td>
+              </tr>
+              <tr>
+                <td><code>--min_coverage</code></td>
+                <td>Integer</td>
+                <td><code>10</code> (Illumina)<br><code>50</code> (ONT)</td>
+                <td>Minimum sequencing depth (DP) required to call variants and calculate coverage breadth.</td>
+              </tr>
+              <tr>
+                <td><code>--min_freq</code></td>
+                <td>Float</td>
+                <td><code>0.2</code> (Illumina)<br><code>0.5</code> (ONT)</td>
+                <td>Minimum alternative allele frequency (AF) to report variants.</td>
+              </tr>
+              <tr>
+                <td><code>--min_qual</code></td>
+                <td>Integer</td>
+                <td><code>20</code> (Illumina)<br><code>15</code> (ONT)</td>
+                <td>Minimum base quality score for read filtering and alignment.</td>
+              </tr>
+              <tr>
+                <td><code>--min_variant_qual</code></td>
+                <td>Integer</td>
+                <td><code>20</code></td>
+                <td>Minimum phred-scaled variant confidence score (VCF <code>QUAL</code> column).</td>
+              </tr>
+              <tr>
+                <td><code>--min_consensus_depth</code></td>
+                <td>Integer</td>
+                <td><code>min_coverage</code></td>
+                <td>Threshold below which consensus FASTA positions are masked with <code>N</code>.</td>
+              </tr>
+              <tr>
+                <td><code>--use_iupac</code></td>
+                <td>Boolean</td>
+                <td><code>false</code></td>
+                <td>When <code>true</code>, consensus calling outputs IUPAC nucleotide ambiguity codes (e.g. <code>R, Y, S, W</code>) for mixed subclonal sites.</td>
+              </tr>
+              <tr>
+                <td><code>--ont_adapter</code></td>
+                <td>String</td>
+                <td>Oxford Kit default</td>
+                <td>Custom adapter sequence for Oxford Nanopore trimming via BBDuk.</td>
+              </tr>
+              <tr>
+                <td><code>--outdir</code></td>
+                <td>Path</td>
+                <td><code>./results</code></td>
+                <td>Destination directory for output BAM, VCF, FASTA, and JSON reports.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Section: Interactive Command Builder -->
+      <section id="builder">
+        <h2>5. Interactive CLI Command Generator</h2>
+        <p>Configure your experiment settings below to construct a copy-pasteable Nextflow command line:</p>
+
+        <div class="builder-panel">
+          <div class="builder-grid">
+            <div class="builder-control">
+              <label class="builder-label">Sequencing Platform</label>
+              <select id="builderPlatform" class="builder-select" onchange="updateBuilderCommand()">
+                <option value="illumina" selected>Illumina (Paired-End)</option>
+                <option value="ont">Oxford Nanopore (Single-End)</option>
+              </select>
+            </div>
+            <div class="builder-control">
+              <label class="builder-label">Input Mode</label>
+              <select id="builderInputMode" class="builder-select" onchange="updateBuilderCommand()">
+                <option value="samplesheet" selected>Samplesheet CSV</option>
+                <option value="glob">Glob Pattern</option>
+              </select>
+            </div>
+            <div class="builder-control">
+              <label class="builder-label">Min Depth (Coverage)</label>
+              <input type="number" id="builderMinCov" class="builder-input" value="100" oninput="updateBuilderCommand()">
+            </div>
+            <div class="builder-control">
+              <label class="builder-label">Min Allele Frequency</label>
+              <input type="number" id="builderMinFreq" class="builder-input" step="0.05" value="0.20" oninput="updateBuilderCommand()">
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+            <label class="builder-checkbox">
+              <input type="checkbox" id="builderIupac" onchange="updateBuilderCommand()">
+              Enable IUPAC Consensus Ambiguities (<code>--use_iupac</code>)
+            </label>
+            <label class="builder-checkbox">
+              <input type="checkbox" id="builderPrimers" checked onchange="updateBuilderCommand()">
+              Include Primer BED Trimming
+            </label>
+            <label class="builder-checkbox">
+              <input type="checkbox" id="builderGff" checked onchange="updateBuilderCommand()">
+              Include GFF3 Annotation
+            </label>
+          </div>
+
+          <div class="code-container" style="margin-top: 1.25rem;">
+            <div class="code-header">
+              <span>GENERATED NEXTFLOW COMMAND</span>
+              <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+            </div>
+            <pre><code id="builderGeneratedCommand">nextflow run pipeline/main.nf --platform illumina ...</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section: Samplesheet & Metadata -->
+      <section id="samplesheets">
+        <h2>6. Samplesheets & Metadata Specification</h2>
+
+        <h3>Samplesheet CSV Format (<code>--sample_sheet</code>)</h3>
+        <p>A samplesheet allows precise mapping of multiplexed sample barcodes, controls, and read pairs without relying on shell regex expansions.</p>
+
+        <div class="tab-group">
+          <div class="tab-buttons">
+            <button class="tab-btn active" onclick="switchTab(this, 'tab-sheet-illumina')">Illumina Paired-End</button>
+            <button class="tab-btn" onclick="switchTab(this, 'tab-sheet-ont')">Oxford Nanopore</button>
+          </div>
+          <div id="tab-sheet-illumina" class="tab-content active">
+            <div class="code-container">
+              <div class="code-header"><span>samplesheet.csv (Illumina)</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+              <pre><code>sample_id,platform,fastq_1,fastq_2
+NTC,illumina,raw_data/NTC_R1.fastq.gz,raw_data/NTC_R2.fastq.gz
+Sample01,illumina,raw_data/Sample01_R1.fastq.gz,raw_data/Sample01_R2.fastq.gz
+Sample02,illumina,raw_data/Sample02_R1.fastq.gz,raw_data/Sample02_R2.fastq.gz</code></pre>
+            </div>
+          </div>
+          <div id="tab-sheet-ont" class="tab-content">
+            <div class="code-container">
+              <div class="code-header"><span>samplesheet.csv (ONT)</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+              <pre><code>sample_id,platform,fastq_1
+barcode01,ont,raw_data/barcode01.fastq.gz
+barcode02,ont,raw_data/barcode02.fastq.gz
+barcode03,ont,raw_data/barcode03.fastq.gz</code></pre>
+            </div>
+          </div>
+        </div>
+
+        <h3>Sample Metadata CSV Format (<code>--metadata</code>)</h3>
+        <p>Metadata fields provided in this CSV are automatically bound to each sample inside <code>viromics_run_report.json</code> and surfaced as filterable badges and tooltips across the React dashboard.</p>
+
+        <div class="code-container">
+          <div class="code-header"><span>metadata.csv</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre><code>sample_id,collection_date,location,host,lineage
+Sample01,2026-03-15,Sydney,Human,BA.2.86
+Sample02,2026-03-16,Melbourne,Human,JN.1
+NTC,2026-03-15,Sydney,Control,None</code></pre>
+        </div>
+      </section>
+
+      <!-- Section: Multi-Strain / Co-Infection -->
+      <section id="multi-ref">
+        <h2>7. Multi-Strain & Viral Co-Infection Detection</h2>
+        <p>
+          Viromics natively supports multi-FASTA reference files. This is essential for respiratory multiplex panels (e.g. distinguishing <strong>RSV-A</strong> and <strong>RSV-B</strong>, or Influenza A subtypes H1N1 and H3N2) where multiple viruses or strains may co-exist within a single clinical specimen.
+        </p>
+
+        <div class="callout callout-info">
+          <div class="callout-title">Co-Detection Classification Logic</div>
+          <p>
+            When a reference multi-FASTA has $N$ target strains, the aggregator computes coverage breadth ($\ge 	ext{minCoverageThreshold}$) independently for every strain. If a sample exhibits <strong>$\ge 50\%$ coverage breadth</strong> across multiple reference contigs, Viromics flags the sample with a <strong>Co-detection Badge</strong> (e.g. <code>Co-detection: RSV-A + RSV-B</code>) and generates dedicated mutation tables for each strain in the genomics report.
+          </p>
+        </div>
+      </section>
+
+      <!-- Section: Tools & Modules Deep Dive -->
+      <section id="tools-modules">
+        <h2>8. Underlying Tools & Pipeline Stages</h2>
+        <p>Each pipeline stage utilizes gold-standard bioinformatics utilities configured with specific parameters for amplicon viral sequencing:</p>
+
+        <div class="card-grid">
+          <div class="card">
+            <div class="card-title">1. FASTQ_QC</div>
+            <p><strong>Tools:</strong> BBDuk (BBMap) + fastp<br>
+            Performs adapter trimming (standard Illumina or custom ONT kit sequences), followed by polyG/tail trimming and base quality filtering (<code>-q 20</code> Illumina / <code>-q 15</code> ONT). Emits clean FastQs and Q30 metrics.</p>
+          </div>
+          <div class="card">
+            <div class="card-title">2. INDEX & ALIGN</div>
+            <p><strong>Tools:</strong> BWA-MEM / Minimap2 + Samtools<br>
+            References are pre-indexed once per workflow execution via <code>INDEX_REFERENCE</code>. Reads are aligned (BWA-MEM for paired-end Illumina, Minimap2 <code>-ax map-ont</code> for ONT) and sorted into BAMs.</p>
+          </div>
+          <div class="card">
+            <div class="card-title">3. PRIMER_TRIM</div>
+            <p><strong>Tools:</strong> Samtools ampliconclip<br>
+            Clips synthetic primer sequences at amplicon ends (<code>--both-ends -b primer_bed</code>). This prevents artificial primer sequences from masking true biological viral variants.</p>
+          </div>
+          <div class="card">
+            <div class="card-title">4. VARIANT_CALL</div>
+            <p><strong>Tools:</strong> BCFtools mpileup & call<br>
+            Configured with <code>-d 8000 -L 8000</code> to prevent indel dropping in high-depth amplicons. Calls haploid genotypes (<code>--ploidy 1</code>) and filters by depth, allele frequency, and QUAL &ge; 20.</p>
+          </div>
+          <div class="card">
+            <div class="card-title">5. CONSENSUS_GEN</div>
+            <p><strong>Tools:</strong> Samtools depth + BCFtools consensus<br>
+            Uses <code>samtools depth -aa -J</code> to detect zero-coverage and deleted sites. Masks regions below <code>min_consensus_depth</code> with <code>N</code>. Supports IUPAC ambiguity codes via <code>-H I</code>.</p>
+          </div>
+          <div class="card">
+            <div class="card-title">6. AGGREGATE_METRICS</div>
+            <p><strong>Tools:</strong> parse_metrics.py (Python 3)<br>
+            Extracts GFF features, applies curated ribosomal frameshift models, computes pairwise Hamming distance matrices, and compiles the consolidated JSON report.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section: Scientific Assumptions -->
+      <section id="scientific-assumptions">
+        <h2>9. Default Settings & Scientific Assumptions</h2>
+
+        <h3>Sample Quality Classification Rules</h3>
+        <p>The pipeline and dashboard categorize all sample alignments against reference targets into three strict quality tiers:</p>
+
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Tier</th>
+                <th>Mean Depth</th>
+                <th>Coverage Breadth (&ge; minCov)</th>
+                <th>Consensus N Rate</th>
+                <th>Clinical Interpretation</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong style="color:var(--brand-emerald)">PASS</strong></td>
+                <td>&ge; 100x</td>
+                <td>&ge; 95.0%</td>
+                <td>&le; 5.0%</td>
+                <td>High-confidence genome assembly suitable for molecular epidemiology and clade assignment.</td>
+              </tr>
+              <tr>
+                <td><strong style="color:var(--brand-amber)">WARN</strong></td>
+                <td>&ge; 25x</td>
+                <td>&ge; 80.0%</td>
+                <td>&le; 10.0%</td>
+                <td>Acceptable for variant identification; some low-coverage genomic regions masked with Ns.</td>
+              </tr>
+              <tr>
+                <td><strong style="color:var(--brand-rose)">FAIL</strong></td>
+                <td>&lt; 25x</td>
+                <td>&lt; 80.0%</td>
+                <td>&gt; 10.0%</td>
+                <td>Insufficient coverage or excessive dropout. Excluded from phylogenetic tree reconstruction.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>Haploid Genome Biology</h3>
+        <p>Viral genomes (e.g. coronaviruses, flaviviruses, paramyxoviruses) exist as non-diploid single genomes. Viromics enforces haploid variant calling (<code>--ploidy 1</code>) to prevent pseudo-heterozygous diploid calls (such as <code>0/1</code>). Heterogeneous or subclonal intra-host viral quasispecies can be captured through the alternative allele frequency (<code>AF</code>) and optional IUPAC ambiguity codes.</p>
+
+        <h3>Deletion Protection in Depth Masking</h3>
+        <p>
+          Standard depth calculations can mistake true biological deletions (e.g. spike 69-70del) for sequencing failures. Viromics executes <code>samtools depth -aa -J</code>, where <code>-J</code> incorporates reads spanning deletion junctions. This guarantees that authentic deletions are not erroneously masked as <code>N</code>.
+        </p>
+      </section>
+
+      <!-- Section: Curated Frameshift Models -->
+      <section id="curated-models">
+        <h2>10. Curated CDS Models & Ribosomal Slippage</h2>
+        <p>
+          In viruses such as SARS-CoV-2, key proteins like <strong>ORF1ab polyprotein</strong> are translated via a programmed -1 ribosomal frameshift (ribosomal slippage) at a slippery heptanucleotide motif (<code>UUUAAAC</code>) followed by an RNA pseudoknot. Traditional naive GFF parsers fail because the two coding exons are in different reading frames.
+        </p>
+
+        <div class="callout callout-warning">
+          <div class="callout-title">Fail-Closed Safety Guarantee</div>
+          <p>
+            Viromics follows a strict fail-closed policy. If a GFF feature contains translation exceptions (e.g. <code>exception=ribosomal_slippage</code>) without a verified curated model, it returns:
+            <br>
+            <code>{"aa_change": "AA annotation unavailable", "status": "unsupported_programmed_frameshift"}</code>
+            <br>
+            It will <strong>never</strong> emit false-positive missense annotations for uncurated frameshift features.
+          </p>
+        </div>
+
+        <h3>Curated Model Specification (<code>resources/annotation_models/cds_models.json</code>)</h3>
+        <p>To support valid translation of frameshifted polyproteins, Viromics loads external JSON model files:</p>
+
+        <div class="code-container">
+          <div class="code-header"><span>cds_models.json</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre><code>[
+  {
+    "model_id": "sars_cov2_orf1ab",
+    "reference": "NC_045512.2",
+    "feature_names": ["ORF1ab", "orf1ab", "cds-YP_009724389.1"],
+    "products": ["ORF1ab polyprotein", "replicase polyprotein 1ab"],
+    "strand": "+",
+    "coordinate_system": "1_based_inclusive",
+    "translation_exception_status": "unsupported_programmed_frameshift",
+    "intervals": [
+      {
+        "label": "ORF1a",
+        "start": 266,
+        "end": 13468,
+        "phase": 0,
+        "frame_offset": 0
+      },
+      {
+        "label": "ORF1b",
+        "start": 13468,
+        "end": 21555,
+        "phase": 0,
+        "frame_offset": -1
+      }
+    ]
+  }
+]</code></pre>
+        </div>
+      </section>
+
+      <!-- Section: SNP Distance & UPGMA Tree -->
+      <section id="snp-distance">
+        <h2>11. Epidemiological Distance Engine & UPGMA Tree</h2>
+
+        <h3>Whole-Genome Pairwise Hamming Distance</h3>
+        <p>
+          Viromics calculates distance matrices in <code>parse_metrics.py</code> using a robust whole-genome consensus pairwise algorithm designed to eliminate sequencing artifacts:
+        </p>
+        <ul>
+          <li><strong>Coverage Gate:</strong> Only genomic positions with sequencing depth $\ge 	ext{minCoverageThreshold}$ in <em>both</em> samples are evaluated.</li>
+          <li><strong>Major Allele Filter:</strong> Only major consensus alleles ($	ext{AF} \ge 0.5$) are counted to prevent minor subclonal variants from biasing transmission linkages.</li>
+          <li><strong>Deletion Masking:</strong> Structural deletions and uncalled bases (<code>N</code>) are omitted from the SNP mismatch denominator.</li>
+          <li><strong>Zero-Overlap Assignment:</strong> If two samples share zero mutually covered genomic positions, their distance is assigned as <code>1.0</code> (maximum 100% divergence) rather than <code>0.0</code>.</li>
+        </ul>
+
+        <h3>Rooted UPGMA Phylogenetic Reconstruction</h3>
+        <p>
+          The client-side dashboard parses <code>report.distance_matrices</code> and applies Unweighted Pair Group Method with Arithmetic Mean (UPGMA) clustering:
+        </p>
+        <ul>
+          <li><strong>80% Coverage Safe-Guard:</strong> Samples with $&lt; 80\%$ coverage breadth are filtered out of the tree to prevent missing data from creating artifactual branch lengths.</li>
+          <li><strong>Cluster-Size Weighting:</strong> When merging clusters $A$ and $B$, distances to cluster $K$ are proportionally weighted by sample counts:
+            $$d_{(A \cup B), K} = rac{|A| \cdot d_{A, K} + |B| \cdot d_{B, K}}{|A| + |B|}$$
+          </li>
+          <li><strong>Calibrated Divergence Scale:</strong> UPGMA node height is defined as $h = d(A, B) / 2$. The tree's time/divergence axis is calibrated by $2	imes$ so displayed tick marks represent true pairwise percent divergence.</li>
+        </ul>
+      </section>
+
+      <!-- Section: Expected Outputs -->
+      <section id="expected-outputs">
+        <h2>12. Expected Outputs & Directory Layout</h2>
+        <p>Upon pipeline completion, the target <code>--outdir</code> directory is organized into sample subdirectories and run-level files:</p>
+
+        <div class="code-container">
+          <div class="code-header"><span>Output Directory Hierarchy</span></div>
+          <pre><code>results/
+├── viromics_run_report.json       <-- Consolidated run report (for Dashboard)
+├── pipeline_info/
+│   ├── execution_report.html       <-- Nextflow run duration, RAM, CPU report
+│   └── execution_timeline.html     <-- Process execution timeline chart
+└── [sample_id]/
+    ├── qc/
+    │   ├── [sample_id]_fastp.json  <-- Read filtering statistics and Q30 rates
+    │   ├── [sample_id]_fastp.html  <-- Interactive HTML quality report
+    │   └── [sample_id]_trimmed*.fq <-- Cleaned FASTQ reads
+    ├── alignment/
+    │   ├── [sample_id]_raw.bam     <-- Raw aligned reads
+    │   ├── [sample_id]_trimmed.bam <-- Primer-clipped, coordinate-sorted BAM
+    │   └── [sample_id]_trimmed.bam.bai
+    ├── variants/
+    │   ├── [sample_id]_raw.bcf     <-- Unfiltered candidate variants
+    │   ├── [sample_id].vcf         <-- Filtered VCF variant file
+    │   ├── [sample_id].vcf.gz      <-- Compressed and tabix-indexed VCF
+    │   └── [sample_id].vcf.gz.tbi
+    └── consensus/
+        ├── [sample_id]_consensus.fasta <-- Assembled FASTA genome
+        └── low_coverage_mask.bed   <-- BED coordinates masked with N</code></pre>
+        </div>
+      </section>
+
+      <!-- Section: JSON Schema -->
+      <section id="json-schema">
+        <h2>13. Run Report JSON Anatomy</h2>
+        <p>The <code>viromics_run_report.json</code> file is strictly validated by <code>validate_report_schema()</code> in <code>parse_metrics.py</code>. Key fields include:</p>
+
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Field Path</th>
+                <th>Type</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>run_id</code></td>
+                <td>String</td>
+                <td>Unique timestamped identifier for the pipeline run.</td>
+              </tr>
+              <tr>
+                <td><code>min_coverage_threshold</code></td>
+                <td>Integer</td>
+                <td>The minimum depth threshold applied during this run (e.g. 10 or 100).</td>
+              </tr>
+              <tr>
+                <td><code>references</code></td>
+                <td>Array</td>
+                <td>List of reference strains with <code>name</code>, <code>length</code>, and <code>sequence</code>.</td>
+              </tr>
+              <tr>
+                <td><code>distance_matrices</code></td>
+                <td>Object</td>
+                <td>2D distance matrix per reference keyed by positional index matching <code>distance_matrix_order</code>.</td>
+              </tr>
+              <tr>
+                <td><code>distance_matrices_by_name</code></td>
+                <td>Object</td>
+                <td>Dictionary mapping <code>[ref][sampleA][sampleB] -> float_distance</code>.</td>
+              </tr>
+              <tr>
+                <td><code>samples[].qc</code></td>
+                <td>Object</td>
+                <td>Includes <code>raw_reads</code>, <code>trimmed_reads</code>, <code>q30_rate_raw</code>, <code>q30_rate_trimmed</code>, <code>duplication_rate</code>.</td>
+              </tr>
+              <tr>
+                <td><code>samples[].coverage[ref]</code></td>
+                <td>Object</td>
+                <td>Contains <code>mean_depth</code>, <code>coverage_breadth_min_cov</code>, and 100bp binned <code>coverage_profile</code>.</td>
+              </tr>
+              <tr>
+                <td><code>samples[].consensus[ref]</code></td>
+                <td>Object</td>
+                <td>Contains <code>length</code>, <code>gc_content</code>, <code>n_content</code>, and complete consensus <code>sequence</code>.</td>
+              </tr>
+              <tr>
+                <td><code>samples[].variants[]</code></td>
+                <td>Array</td>
+                <td>List of variants with <code>position</code>, <code>ref</code>, <code>alt</code>, <code>frequency</code>, <code>depth</code>, <code>gene</code>, <code>aa_change</code>, and <code>status</code>.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Section: Web Dashboard Guide -->
+      <section id="dashboard-guide">
+        <h2>14. Interactive Web Dashboard Guide</h2>
+        <p>The React web application provides 5 integrated analytical views:</p>
+
+        <div class="card-grid">
+          <div class="card">
+            <div class="card-title">1. Run Overview</div>
+            <p>Cohort quality pass rates, reference strain summary, and a sortable QC table displaying mapped reads, mean depth, breadth at $\ge 	ext{minCov}$, and PASS/WARN/FAIL status badges with interactive tooltips.</p>
+          </div>
+          <div class="card">
+            <div class="card-title">2. Sample Details</div>
+            <p>Granular sample inspection featuring an interactive Recharts depth profile with low-coverage shading, a staggered SVG Gene Map with variant pins, and a searchable VCF table with CSV export.</p>
+          </div>
+          <div class="card">
+            <div class="card-title">3. Mutational Sharing</div>
+            <p>Epidemiological variant sharing matrix. Differentiates clonal mutations (&ge;90%), subclonal mutations (&lt;90%), true wild-type reference alleles, and sequencing dropout masked as <code>N</code>.</p>
+          </div>
+          <div class="card">
+            <div class="card-title">4. Phylogenetic Tree</div>
+            <p>Rooted UPGMA dendrogram calculated from the whole-genome distance matrix. Filtered to samples with &ge;80% coverage to prevent dropout artifacts, with calibrated pairwise divergence scale.</p>
+          </div>
+          <div class="card">
+            <div class="card-title">5. Genomics Report Card</div>
+            <p>Printable clinical epidemiology report card. Summarizes sample identifiers, sequencing quality assurance, and detected mutations with one-click clean PDF export.</p>
+          </div>
+        </div>
+
+        <div class="callout callout-success">
+          <div class="callout-title">Crash-Resilient React Architecture</div>
+          <p>
+            Every dashboard view is wrapped in a dedicated React <code>ErrorBoundary</code>. If malformed data or a rendering glitch occurs in any single view, the application isolates the error with a friendly warning card and a "Retry View" button while keeping the rest of the navigation alive.
+          </p>
+        </div>
+      </section>
+
+      <!-- Section: Troubleshooting & FAQs -->
+      <section id="faq">
+        <h2>15. Troubleshooting & Frequently Asked Questions</h2>
+
+        <div class="accordion-item">
+          <div class="accordion-header" onclick="toggleAccordion(this)">
+            <span>Why does my sample show "FAIL" in the Overview status column?</span>
+            <span class="accordion-icon">▼</span>
+          </div>
+          <div class="accordion-body">
+            A sample receives a <code>FAIL</code> badge if its mean depth is below 25x, its coverage breadth at the minimum threshold is below 80%, or its consensus FASTA contains more than 10% uncalled bases (<code>N</code>). Hover over the FAIL badge in the dashboard to see the exact offending metric.
+          </div>
+        </div>
+
+        <div class="accordion-item">
+          <div class="accordion-header" onclick="toggleAccordion(this)">
+            <span>Why is my sample missing from the Phylogenetic Tree?</span>
+            <span class="accordion-icon">▼</span>
+          </div>
+          <div class="accordion-body">
+            To prevent severe phylogenetic distortion, the UPGMA dendrogram strictly excludes samples with less than 80% coverage breadth across the active reference genome. These excluded samples are listed in a notification banner at the top of the tree tab.
+          </div>
+        </div>
+
+        <div class="accordion-item">
+          <div class="accordion-header" onclick="toggleAccordion(this)">
+            <span>Why does a variant show "AA annotation unavailable"?</span>
+            <span class="accordion-icon">▼</span>
+          </div>
+          <div class="accordion-body">
+            Viromics operates on a fail-closed principle for biological safety. If a GFF feature indicates a programmed translation exception (such as ribosomal slippage or frameshifts) that does not match an entry in <code>resources/annotation_models/cds_models.json</code>, Viromics refuses to guess the amino acid change. It reports <code>AA annotation unavailable</code> alongside the specific status code (e.g. <code>unsupported_programmed_frameshift</code>).
+          </div>
+        </div>
+
+        <div class="accordion-item">
+          <div class="accordion-header" onclick="toggleAccordion(this)">
+            <span>Can I analyze custom viral pathogens not included in the examples?</span>
+            <span class="accordion-icon">▼</span>
+          </div>
+          <div class="accordion-body">
+            Yes! Viromics is virus-agnostic. Simply provide your viral reference genome via <code>--reference your_virus.fasta</code>. If you have primer schemes, supply <code>--primer_bed primers.bed</code>, and if you have annotations, provide <code>--gff annotations.gff3</code>.
+          </div>
+        </div>
+
+        <div class="accordion-item">
+          <div class="accordion-header" onclick="toggleAccordion(this)">
+            <span>How do I adjust memory or CPU allocations for high-throughput runs?</span>
+            <span class="accordion-icon">▼</span>
+          </div>
+          <div class="accordion-body">
+            Edit the <code>process</code> block in <code>pipeline/nextflow.config</code>, or pass resource flags on the command line (e.g. <code>--max_cpus 16 --max_memory 32.GB</code>).
+          </div>
+        </div>
+      </section>
+
+      <!-- Footer -->
+      <footer>
+        <p>Viromics: Genomic Epidemiology Suite &bull; Open-source under MIT License</p>
+        <p style="margin-top: 4px; font-size: 0.78rem;">To update this documentation, edit <code>wiki.html</code> in the repository root.</p>
+      </footer>
+
+    </main>
+  </div>
+
+  <script>
+    // Copy code button handler
+    function copyCode(btn) {
+      const container = btn.closest('.code-container');
+      const code = container.querySelector('code').innerText;
+      navigator.clipboard.writeText(code).then(() => {
+        const originalText = btn.innerText;
+        btn.innerText = 'Copied!';
+        btn.style.color = 'var(--brand-emerald)';
+        btn.style.borderColor = 'var(--brand-emerald)';
+        setTimeout(() => {
+          btn.innerText = originalText;
+          btn.style.color = '';
+          btn.style.borderColor = '';
+        }, 2000);
+      });
+    }
+
+    // Tab switcher
+    function switchTab(btn, targetId) {
+      const tabGroup = btn.closest('.tab-group');
+      tabGroup.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      tabGroup.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      const target = document.getElementById(targetId);
+      if (target) target.classList.add('active');
+    }
+
+    // Accordion toggle
+    function toggleAccordion(header) {
+      const item = header.closest('.accordion-item');
+      item.classList.toggle('open');
+    }
+
+    // Theme Toggle
+    function toggleTheme() {
+      const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+      const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', newTheme);
+      const btn = document.getElementById('themeToggleBtn');
+      btn.innerText = newTheme === 'dark' ? '🌙' : '☀️';
+      localStorage.setItem('viromics-theme', newTheme);
+    }
+
+    // Load saved theme
+    (function() {
+      const saved = localStorage.getItem('viromics-theme');
+      if (saved) {
+        document.documentElement.setAttribute('data-theme', saved);
+        const btn = document.getElementById('themeToggleBtn');
+        if (btn) btn.innerText = saved === 'dark' ? '🌙' : '☀️';
+      }
+    })();
+
+    // Interactive Command Builder Logic
+    function updateBuilderCommand() {
+      const platform = document.getElementById('builderPlatform').value;
+      const inputMode = document.getElementById('builderInputMode').value;
+      const minCov = document.getElementById('builderMinCov').value || '10';
+      const minFreq = document.getElementById('builderMinFreq').value || '0.2';
+      const useIupac = document.getElementById('builderIupac').checked;
+      const hasPrimers = document.getElementById('builderPrimers').checked;
+      const hasGff = document.getElementById('builderGff').checked;
+
+      let cmd = `nextflow run pipeline/main.nf \
+  --platform ${platform}`;
+
+      if (inputMode === 'samplesheet') {
+        cmd += ` \
+  --sample_sheet samplesheet.csv`;
+      } else {
+        cmd += ` \
+  --reads "${platform === 'illumina' ? 'raw_data/*_R{1,2}.fastq.gz' : 'raw_data/*.fastq.gz'}"`;
+      }
+
+      cmd += ` \
+  --reference reference/genome.fasta`;
+
+      if (hasGff) {
+        cmd += ` \
+  --gff reference/annotations.gff3`;
+      }
+      if (hasPrimers) {
+        cmd += ` \
+  --primer_bed reference/primers.bed`;
+      }
+
+      cmd += ` \
+  --min_coverage ${minCov}`;
+      cmd += ` \
+  --min_freq ${minFreq}`;
+
+      if (useIupac) {
+        cmd += ` \
+  --use_iupac`;
+      }
+
+      cmd += ` \
+  --outdir results/${platform}_run \
+  -profile conda`;
+
+      const codeEl = document.getElementById('builderGeneratedCommand');
+      if (codeEl) codeEl.innerText = cmd;
+    }
+
+    // Initialize command builder
+    updateBuilderCommand();
+
+    // Live search filter across wiki
+    function handleWikiSearch(query) {
+      query = query.trim().toLowerCase();
+      const sections = document.querySelectorAll('.main-content section');
+      const navLinks = document.querySelectorAll('.sidebar .nav-link');
+
+      if (!query) {
+        sections.forEach(s => s.style.display = '');
+        navLinks.forEach(l => l.style.display = '');
+        return;
+      }
+
+      sections.forEach(section => {
+        const text = section.innerText.toLowerCase();
+        const matches = text.includes(query);
+        section.style.display = matches ? '' : 'none';
+      });
+
+      navLinks.forEach(link => {
+        const targetId = link.getAttribute('href').substring(1);
+        const targetSec = document.getElementById(targetId);
+        if (targetSec) {
+          link.style.display = targetSec.style.display === 'none' ? 'none' : '';
+        }
+      });
+    }
+
+    // Scroll spy for sidebar links
+    window.addEventListener('scroll', () => {
+      const sections = document.querySelectorAll('.main-content section');
+      const navLinks = document.querySelectorAll('.sidebar .nav-link');
+      let currentId = '';
+
+      sections.forEach(section => {
+        const top = section.offsetTop - 120;
+        if (window.scrollY >= top) {
+          currentId = section.getAttribute('id');
+        }
+      });
+
+      if (currentId) {
+        navLinks.forEach(link => {
+          link.classList.remove('active');
+          if (link.getAttribute('href') === '#' + currentId) {
+            link.classList.add('active');
+          }
+        });
+      }
+    });
+  </script>
+</body>
+</html>

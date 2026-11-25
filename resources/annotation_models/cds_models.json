@@ -1,0 +1,27 @@
+[
+  {
+    "model_id": "sars_cov2_orf1ab",
+    "reference": "NC_045512.2",
+    "feature_names": ["ORF1ab", "orf1ab", "cds-YP_009724389.1"],
+    "products": ["ORF1ab polyprotein", "replicase polyprotein 1ab"],
+    "strand": "+",
+    "coordinate_system": "1_based_inclusive",
+    "translation_exception_status": "unsupported_programmed_frameshift",
+    "intervals": [
+      {
+        "label": "ORF1a",
+        "start": 266,
+        "end": 13468,
+        "phase": 0,
+        "frame_offset": 0
+      },
+      {
+        "label": "ORF1b",
+        "start": 13468,
+        "end": 21555,
+        "phase": 0,
+        "frame_offset": -1
+      }
+    ]
+  }
+]

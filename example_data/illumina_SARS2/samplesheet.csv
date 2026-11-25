@@ -1,0 +1,5 @@
+sample_id,platform,fastq_1,fastq_2
+NTC,illumina,example_data/illumina_SARS2/input/NTC_R1.fastq.gz,example_data/illumina_SARS2/input/NTC_R2.fastq.gz
+Sample01,illumina,example_data/illumina_SARS2/input/Sample01_R1.fastq.gz,example_data/illumina_SARS2/input/Sample01_R2.fastq.gz
+Sample02,illumina,example_data/illumina_SARS2/input/Sample02_R1.fastq.gz,example_data/illumina_SARS2/input/Sample02_R2.fastq.gz
+Sample03,illumina,example_data/illumina_SARS2/input/Sample03_R1.fastq.gz,example_data/illumina_SARS2/input/Sample03_R2.fastq.gz

@@ -1,23 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { GitBranch, AlertCircle, Info, Download } from 'lucide-react';
 
-export default function PhylogeneticTree({ samples, selectedRefName, setSelectedRefName, refs = [], distanceMatrices = {} }) {
+export default function PhylogeneticTree({ 
+  samples, 
+  selectedRefName, 
+  setSelectedRefName, 
+  refs = [], 
+  distanceMatrices = {}, 
+  distanceMatrixOrder = [],
+  minCoverageThreshold = 10
+}) {
   const [treeData, setTreeData] = useState(null);
   const [distanceMatrix, setDistanceMatrix] = useState([]);
   const [hoveredNode, setHoveredNode] = useState(null);
 
-  // Filter samples into passing (>= 80% coverage breadth) and excluded (< 80%) for the active strain
-  const passingSamples = samples.filter(sample => {
+  const getBreadth = (sample) => {
     const cov = (selectedRefName && sample.coverage && sample.coverage[selectedRefName]) ? sample.coverage[selectedRefName] : (sample.coverage || {});
-    const breadth = cov.coverage_breadth_10x !== undefined ? cov.coverage_breadth_10x : 0;
-    return breadth >= 80.0;
-  });
+    return cov.coverage_breadth_min_cov !== undefined ? cov.coverage_breadth_min_cov : (cov.coverage_breadth_10x !== undefined ? cov.coverage_breadth_10x : 0);
+  };
 
-  const excludedSamples = samples.filter(sample => {
-    const cov = (selectedRefName && sample.coverage && sample.coverage[selectedRefName]) ? sample.coverage[selectedRefName] : (sample.coverage || {});
-    const breadth = cov.coverage_breadth_10x !== undefined ? cov.coverage_breadth_10x : 0;
-    return breadth < 80.0;
-  });
+  // Filter samples into passing (>= 80% coverage breadth) and excluded (< 80%) for the active strain
+  const passingSamples = samples.filter(sample => getBreadth(sample) >= 80.0);
+  const excludedSamples = samples.filter(sample => getBreadth(sample) < 80.0);
 
   useEffect(() => {
     if (!samples || passingSamples.length < 2) {
@@ -34,8 +38,13 @@ export default function PhylogeneticTree({ samples, selectedRefName, setSelected
     const precalcMatrix = (selectedRefName && distanceMatrices && distanceMatrices[selectedRefName]) ? distanceMatrices[selectedRefName] : null;
     
     if (precalcMatrix) {
-      // Find the index of each passing sample in the original samples list
-      const originalIndices = passingSamples.map(ps => samples.findIndex(s => s.sample_id === ps.sample_id));
+      // Find the index of each passing sample in the distance matrix order (if available) to ensure stable alignment
+      const originalIndices = passingSamples.map(ps => {
+        if (distanceMatrixOrder && Array.isArray(distanceMatrixOrder) && distanceMatrixOrder.length > 0) {
+          return distanceMatrixOrder.findIndex(name => name === ps.sample_id);
+        }
+        return samples.findIndex(s => s.sample_id === ps.sample_id);
+      });
       
       for (let i = 0; i < numSamples; i++) {
         const idxA = originalIndices[i];
@@ -51,11 +60,12 @@ export default function PhylogeneticTree({ samples, selectedRefName, setSelected
     } else {
       // Fallback distance calculation if no precalculated matrix exists (e.g. legacy/mock reports)
       const getSeq = (sample) => {
-        if (!sample.consensus) return null;
-        if (selectedRefName && sample.consensus[selectedRefName]) {
-          return sample.consensus[selectedRefName].sequence;
-        }
-        return sample.consensus.sequence;
+        if (!sample || !sample.consensus) return null;
+        const c = (selectedRefName && sample.consensus[selectedRefName]) ? sample.consensus[selectedRefName] : sample.consensus;
+        if (!c) return null;
+        if (typeof c === 'string') return c;
+        if (typeof c.sequence === 'string') return c.sequence;
+        return null;
       };
 
       for (let i = 0; i < numSamples; i++) {
@@ -92,7 +102,7 @@ export default function PhylogeneticTree({ samples, selectedRefName, setSelected
     // Initialize clusters (nodes)
     let clusters = passingSamples.map((s, idx) => ({
       id: `leaf_${idx}`,
-      name: selectedRefName ? `${s.sample_id} (${selectedRefName.split('_')[0]})` : s.sample_id,
+      name: s.sample_id,
       isLeaf: true,
       height: 0,
       indices: [idx],
@@ -156,7 +166,7 @@ export default function PhylogeneticTree({ samples, selectedRefName, setSelected
     if (activeClusters.length > 0) {
       setTreeData(activeClusters[0]);
     }
-  }, [samples, selectedRefName]);
+  }, [samples, selectedRefName, distanceMatrices, distanceMatrixOrder]);
 
   if (!samples || samples.length < 2) {
     return (
@@ -294,7 +304,7 @@ export default function PhylogeneticTree({ samples, selectedRefName, setSelected
                     <g key={i}>
                       <line x1={x} y1={20} x2={x} y2={svgHeight - 20} stroke="rgba(36,47,77,0.2)" strokeDasharray="3 3" />
                       <text x={x} y={svgHeight - 5} fill="#9ca3af" fontSize="8" textAnchor="middle" fontFamily="Fira Code">
-                        {(dist * 100).toFixed(2)}% div
+                        {(dist * 2 * 100).toFixed(2)}% div
                       </text>
                     </g>
                   );
@@ -407,15 +417,14 @@ export default function PhylogeneticTree({ samples, selectedRefName, setSelected
       {excludedSamples.length > 0 && (
         <div className="border border-dark-border/60 bg-dark-bg/20 rounded-xl p-4 flex flex-col gap-2">
           <span className="text-xs font-semibold text-brand-rose uppercase tracking-wider font-outfit block">
-            Excluded Low-Coverage Samples (&lt;80% Breadth)
+            Excluded Low-Coverage Samples (&lt;80% Breadth at ≥{minCoverageThreshold}x)
           </span>
           <p className="text-[11px] text-gray-400">
             The following samples had insufficient coverage breadth for this strain and were excluded from phylogenetic distance analysis to prevent artificial clustering on uncalled regions (NNNs):
           </p>
           <div className="flex flex-wrap gap-2 mt-1">
             {excludedSamples.map(sample => {
-              const cov = (selectedRefName && sample.coverage && sample.coverage[selectedRefName]) ? sample.coverage[selectedRefName] : (sample.coverage || {});
-              const breadth = cov.coverage_breadth_10x !== undefined ? cov.coverage_breadth_10x : 0;
+              const breadth = getBreadth(sample);
               return (
                 <span key={sample.sample_id} className="text-[11px] bg-dark-card border border-dark-border text-gray-300 font-mono px-2.5 py-1 rounded-lg">
                   {sample.sample_id}: <strong className="text-brand-rose">{breadth.toFixed(1)}% cov</strong>

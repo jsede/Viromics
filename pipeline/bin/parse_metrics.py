@@ -4,7 +4,35 @@ import sys
 import json
 import argparse
 import subprocess
+import urllib.parse
 from collections import defaultdict
+
+CURATED_CDS_MODELS_CACHE = None
+
+def load_curated_models_cached():
+    global CURATED_CDS_MODELS_CACHE
+    if CURATED_CDS_MODELS_CACHE is not None:
+        return CURATED_CDS_MODELS_CACHE
+    
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    paths = [
+        os.path.join(script_dir, "resources", "annotation_models", "cds_models.json"),
+        os.path.join(script_dir, "..", "..", "resources", "annotation_models", "cds_models.json"),
+        # Also check current working directory
+        "resources/annotation_models/cds_models.json"
+    ]
+    for p in paths:
+        if os.path.exists(p):
+            try:
+                with open(p, "r") as f:
+                    CURATED_CDS_MODELS_CACHE = json.load(f)
+                    return CURATED_CDS_MODELS_CACHE
+            except Exception as e:
+                print(f"Warning: Failed to parse curated models file {p}: {e}")
+    
+    CURATED_CDS_MODELS_CACHE = []
+    return CURATED_CDS_MODELS_CACHE
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Aggregate NGS run metrics for Viromics Dashboard")
@@ -72,23 +100,48 @@ def parse_gff(gff_path):
                 end = int(parts[4])
                 strand = parts[6]
                 
+                phase = 0
+                if feature_type == "CDS" and len(parts) >= 8:
+                    phase_col = parts[7].strip()
+                    if phase_col in [".", "", "null"]:
+                        phase = 0
+                    elif phase_col in ["0", "1", "2"]:
+                        phase = int(phase_col)
+                    else:
+                        phase = -1 # Invalid phase
+                
                 # Parse attributes
                 attrs = {}
                 for attr in parts[8].split(";"):
+                    if not attr.strip():
+                        continue
                     if "=" in attr:
                         k, v = attr.split("=", 1)
-                        attrs[k.strip()] = v.strip()
+                        attrs[k.strip()] = urllib.parse.unquote(v.strip())
                 
                 name = attrs.get("gene", attrs.get("Name", attrs.get("ID", "Unknown")))
-                product = attrs.get("product", "").replace("%20", " ")
+                product = attrs.get("product", "")
                 
                 features[ref_id].append({
+                    "ref_id": ref_id,
                     "name": name,
                     "type": feature_type,
                     "start": start,
                     "end": end,
                     "strand": strand,
-                    "product": product
+                    "phase": phase,
+                    "product": product,
+                    "id": attrs.get("ID", ""),
+                    "parent": attrs.get("Parent", ""),
+                    "gene": attrs.get("gene", ""),
+                    "feature_name": attrs.get("Name", ""),
+                    "locus_tag": attrs.get("locus_tag", ""),
+                    "protein_id": attrs.get("protein_id", ""),
+                    "transcript_id": attrs.get("transcript_id", ""),
+                    "exception": attrs.get("exception", ""),
+                    "note": attrs.get("Note", ""),
+                    "transl_except": attrs.get("transl_except", ""),
+                    "attributes": attrs
                 })
     
     # Hierarchical filtering per reference: CDS > gene > exon to prevent duplication clutter
@@ -105,8 +158,89 @@ def parse_gff(gff_path):
             else:
                 selected = f_list
                 
-        # Sort features for each reference by start position
-        sorted_genes[ref_id] = sorted(selected, key=lambda x: x["start"])
+        # Separate CDS features from non-CDS features to handle grouping and sorting
+        cds_only = [f for f in selected if f["type"] == "CDS"]
+        non_cds_only = [f for f in selected if f["type"] != "CDS"]
+        
+        # Group CDS features by (ref_id, strand, grouping_key)
+        cds_groups = defaultdict(list)
+        ungrouped_count = 0
+        for f in cds_only:
+            attrs = f["attributes"]
+            grouping_key = None
+            for key in ["protein_id", "transcript_id", "ID", "Parent", "locus_tag"]:
+                val = attrs.get(key, "").strip()
+                if val and val.lower() != "unknown":
+                    grouping_key = val
+                    break
+            
+            if not grouping_key:
+                ungrouped_count += 1
+                grouping_key = f"__ungrouped_cds_{ungrouped_count}__"
+                
+            f["grouping_key"] = grouping_key
+            cds_groups[(f["strand"], grouping_key)].append(f)
+            
+        # Sort and flag CDS parts within each group
+        groups_list = []
+        for (strand, gkey), group_feats in cds_groups.items():
+            # Sort CDS parts in biological coding order:
+            # + strand: ascending start, then ascending end
+            # - strand: descending start, then descending end
+            if strand == "+":
+                group_feats.sort(key=lambda x: (x["start"], x["end"]))
+            else:
+                group_feats.sort(key=lambda x: (-x["start"], -x["end"]))
+                
+            # Determine multi_part status (two or more rows with distinct intervals)
+            distinct_intervals = {(f["start"], f["end"]) for f in group_feats}
+            is_multi = (len(group_feats) >= 2 and len(distinct_intervals) >= 2)
+            
+            # Determine translation_exception_status
+            has_fs = False
+            has_te = False
+            for f in group_feats:
+                exc_val = " ".join(f.get("exception", "").lower().replace("_", " ").split())
+                note_val = " ".join(f.get("note", "").lower().replace("_", " ").split())
+                if ("programmed ribosomal frameshift" in exc_val or
+                    "ribosomal slippage" in exc_val or
+                    "frameshift" in exc_val or
+                    "programmed ribosomal frameshift" in note_val or
+                    "ribosomal slippage" in note_val or
+                    "frameshift" in note_val):
+                    has_fs = True
+                if f.get("transl_except", "").strip():
+                    has_te = True
+                    
+            if has_fs:
+                exception_status = "unsupported_programmed_frameshift"
+            elif has_te:
+                exception_status = "unsupported_translation_exception"
+            else:
+                exception_status = None
+                
+            requires_curated = (exception_status == "unsupported_programmed_frameshift")
+                
+            for f in group_feats:
+                f["multi_part"] = is_multi
+                f["translation_exception_status"] = exception_status
+                f["requires_curated_model"] = requires_curated
+                
+            groups_list.append(group_feats)
+            
+        # Set default status/multi_part for non-CDS features
+        for f in non_cds_only:
+            f["multi_part"] = False
+            f["translation_exception_status"] = None
+            f["requires_curated_model"] = False
+            f["grouping_key"] = None
+            groups_list.append([f])
+            
+        # Sort the list of groups based on the minimum start position of the group
+        groups_list.sort(key=lambda g: min(f["start"] for f in g))
+        
+        # Flatten the sorted groups into the final list
+        sorted_genes[ref_id] = [f for g in groups_list for f in g]
         
     return sorted_genes
 
@@ -155,7 +289,7 @@ def calculate_coverage(bam_path, ref_lengths, num_bins=500, min_cov=10):
 
     # Run samtools depth
     try:
-        cmd = ["samtools", "depth", "-a", bam_path]
+        cmd = ["samtools", "depth", "-aa", "-J", bam_path]
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         for line in result.stdout.strip().split("\n"):
             if not line:
@@ -177,8 +311,9 @@ def calculate_coverage(bam_path, ref_lengths, num_bins=500, min_cov=10):
     for ref_name, ref_len in ref_lengths.items():
         ref_depths = depths[ref_name]
         mean_depth = sum(ref_depths) / ref_len if ref_len > 0 else 0
-        cov_10x = sum(1 for d in ref_depths if d >= min_cov) / ref_len if ref_len > 0 else 0
+        cov_10x = sum(1 for d in ref_depths if d >= 10) / ref_len if ref_len > 0 else 0
         cov_30x = sum(1 for d in ref_depths if d >= 30) / ref_len if ref_len > 0 else 0
+        cov_min_cov = sum(1 for d in ref_depths if d >= min_cov) / ref_len if ref_len > 0 else 0
         
         bin_size = max(1, ref_len // num_bins)
         downsampled_depths = []
@@ -194,6 +329,7 @@ def calculate_coverage(bam_path, ref_lengths, num_bins=500, min_cov=10):
             "mean_depth": round(mean_depth, 2),
             "coverage_breadth_10x": round(cov_10x * 100, 2),
             "coverage_breadth_30x": round(cov_30x * 100, 2),
+            "coverage_breadth_min_cov": round(cov_min_cov * 100, 2),
             "mapped_reads": mapped_reads[ref_name],
             "coverage_profile": downsampled_depths
         }
@@ -224,29 +360,177 @@ COMPLEMENT = {
     'N':'N', 'n':'n'
 }
 
+def find_matching_model(ref_id, gene, models):
+    if not models:
+        return None
+    for model in models:
+        # Check reference
+        ref_match = model.get("reference")
+        if ref_match and ref_match != ref_id:
+            continue
+            
+        # Check strand
+        model_strand = model.get("strand")
+        if model_strand and model_strand != gene.get("strand"):
+            continue
+            
+        # Check feature name/label/product/ID
+        feature_names = model.get("feature_names", [])
+        products = model.get("products", [])
+        
+        name_match = (
+            gene.get("name") in feature_names or
+            gene.get("id") in feature_names or
+            gene.get("gene") in feature_names or
+            gene.get("feature_name") in feature_names or
+            gene.get("product") in products
+        )
+        if not name_match:
+            continue
+            
+        # Check translation exception status
+        model_status = model.get("translation_exception_status")
+        if model_status and model_status != gene.get("translation_exception_status"):
+            continue
+            
+        return model
+    return None
+
+def run_curated_aa_annotation(pos, ref, alt, model, ref_seq):
+    if not ref_seq:
+        return {"aa_change": "AA annotation unavailable", "status": "curated_model_reference_mismatch"}
+        
+    strand = model.get("strand", "+")
+    
+    # 1. Reconstruct the curated coding sequence and trace genomic positions
+    cds_bases = []
+    cds_positions = []
+    prev_end = None
+    
+    for intv in model.get("intervals", []):
+        start = intv.get("start")
+        end = intv.get("end")
+        phase = intv.get("phase", 0)
+        frame_offset = intv.get("frame_offset", 0)
+        
+        # Check boundary/coordinate validity against reference length
+        if start < 1 or end > len(ref_seq) or start > end:
+            return {"aa_change": "AA annotation unavailable", "status": "curated_model_reference_mismatch"}
+            
+        # Validate phase and frame_offset
+        if frame_offset not in [-1, 0, 1]:
+            return {"aa_change": "AA annotation unavailable", "status": "curated_model_boundary_unsupported"}
+            
+        if strand == "+":
+            intv_pos = list(range(start, end + 1))
+            intv_seq = list(ref_seq[start - 1 : end])
+            # If interval does not repeat the overlap coordinate but specifies frame_offset == -1
+            # (e.g. adjacent intervals start == prev_end + 1 with programmed -1 frameshift):
+            if prev_end is not None and frame_offset == -1 and start == prev_end + 1:
+                intv_pos = [prev_end] + intv_pos
+                intv_seq = [ref_seq[prev_end - 1]] + intv_seq
+        else:
+            intv_pos = list(range(end, start - 1, -1))
+            raw_seq = ref_seq[start - 1 : end]
+            intv_seq = [COMPLEMENT.get(b, b) for b in reversed(raw_seq)]
+            if prev_end is not None and frame_offset == -1 and start == prev_end + 1:
+                intv_pos = [prev_end] + intv_pos
+                intv_seq = [COMPLEMENT.get(ref_seq[prev_end - 1], "N")] + intv_seq
+                
+        prev_end = end
+            
+        # Apply phase/trim (number of bases to skip from start of interval)
+        if phase < 0 or phase > len(intv_seq):
+            return {"aa_change": "AA annotation unavailable", "status": "curated_model_boundary_unsupported"}
+            
+        intv_seq = intv_seq[phase:]
+        intv_pos = intv_pos[phase:]
+        
+        cds_bases.extend(intv_seq)
+        cds_positions.extend(intv_pos)
+        
+    cds_sequence = "".join(cds_bases)
+    
+    # 2. Map the genomic variant position to curated CDS coordinates
+    matching_indices = [i for i, p in enumerate(cds_positions) if p == pos]
+    if not matching_indices:
+        return {"aa_change": "AA annotation unavailable", "status": "curated_model_position_out_of_bounds"}
+        
+    # 3. Perform translation for each matching index
+    aa_changes = []
+    mut_base = alt if strand == "+" else COMPLEMENT.get(alt, alt)
+    
+    for cds_idx in matching_indices:
+        codon_start_idx = (cds_idx // 3) * 3
+        codon_offset = cds_idx % 3
+        
+        # Codon incomplete or out of bounds checks
+        if codon_start_idx < 0 or codon_start_idx + 3 > len(cds_sequence):
+            return {"aa_change": "AA annotation unavailable", "status": "curated_model_codon_incomplete"}
+            
+        wt_codon = cds_sequence[codon_start_idx : codon_start_idx + 3]
+        if len(wt_codon) != 3:
+            return {"aa_change": "AA annotation unavailable", "status": "curated_model_codon_incomplete"}
+            
+        mut_codon_list = list(wt_codon)
+        mut_codon_list[codon_offset] = mut_base
+        mut_codon = "".join(mut_codon_list)
+        
+        wt_aa = GENETIC_CODE.get(wt_codon.upper(), "?")
+        mut_aa = GENETIC_CODE.get(mut_codon.upper(), "?")
+        aa_pos = (cds_idx // 3) + 1
+        
+        if wt_aa == "?" or mut_aa == "?":
+            return {"aa_change": "AA annotation unavailable", "status": "curated_model_boundary_unsupported"}
+            
+        if wt_aa == mut_aa:
+            aa_changes.append(f"{wt_aa}{aa_pos}{mut_aa} (syn)")
+        else:
+            aa_changes.append(f"{wt_aa}{aa_pos}{mut_aa}")
+            
+    if not aa_changes:
+        return {"aa_change": "AA annotation unavailable", "status": "curated_model_boundary_unsupported"}
+        
+    return {"aa_change": "/".join(aa_changes), "status": None}
+
 def get_aa_change(pos, ref, alt, gene, ref_seq):
     """Calculate codon-level amino acid change for SNPs in coding genes."""
     if not ref_seq or len(ref) != 1 or len(alt) != 1:
-        return "Indel" if len(ref) != len(alt) else ""
+        return {"aa_change": "Indel" if len(ref) != len(alt) else "", "status": None}
+        
+    if gene.get("translation_exception_status"):
+        # Lazy load curated models
+        models = load_curated_models_cached()
+        matching_model = find_matching_model(gene.get("ref_id"), gene, models)
+        if not matching_model:
+            # If no curated model matches, fail closed with original status
+            return {"aa_change": "AA annotation unavailable", "status": gene["translation_exception_status"]}
+            
+        # If curated model matches, run curated annotation
+        return run_curated_aa_annotation(pos, ref, alt, matching_model, ref_seq)
+        
+    if gene.get("phase", 0) == -1 or gene.get("multi_part", False):
+        return {"aa_change": "AA annotation unavailable", "status": None}
         
     g_start = gene["start"]
     g_end = gene["end"]
     strand = gene.get("strand", "+")
+    phase = gene.get("phase", 0)
     
     if strand == "+":
         if not (g_start <= pos <= g_end):
-            return ""
-        rel_offset = pos - g_start
+            return {"aa_change": "", "status": None}
+        rel_offset = (pos - g_start) + phase
         codon_index = rel_offset // 3
         codon_offset = rel_offset % 3
-        codon_start = (g_start - 1) + codon_index * 3
+        codon_start = (g_start - 1 - phase) + codon_index * 3
         
         if codon_start < 0 or codon_start + 3 > len(ref_seq):
-            return ""
+            return {"aa_change": "", "status": None}
             
         wt_codon = ref_seq[codon_start : codon_start + 3]
         if len(wt_codon) != 3:
-            return ""
+            return {"aa_change": "", "status": None}
             
         mut_codon_list = list(wt_codon)
         mut_codon_list[codon_offset] = alt
@@ -257,28 +541,28 @@ def get_aa_change(pos, ref, alt, gene, ref_seq):
         aa_pos = codon_index + 1
         
         if wt_aa == "?" or mut_aa == "?":
-            return ""
+            return {"aa_change": "", "status": None}
         if wt_aa == mut_aa:
-            return f"{wt_aa}{aa_pos}{mut_aa} (syn)"
+            return {"aa_change": f"{wt_aa}{aa_pos}{mut_aa} (syn)", "status": None}
         else:
-            return f"{wt_aa}{aa_pos}{mut_aa}"
+            return {"aa_change": f"{wt_aa}{aa_pos}{mut_aa}", "status": None}
             
     else: # strand == "-"
         if not (g_start <= pos <= g_end):
-            return ""
-        rel_offset = g_end - pos
+            return {"aa_change": "", "status": None}
+        rel_offset = (g_end - pos) + phase
         codon_index = rel_offset // 3
         codon_offset = rel_offset % 3
         
-        idx1 = g_end - 1 - codon_index * 3
+        idx1 = (g_end - 1 + phase) - codon_index * 3
         idx3 = idx1 - 2
         
         if idx3 < 0 or idx1 + 1 > len(ref_seq):
-            return ""
+            return {"aa_change": "", "status": None}
             
         genomic_codon = ref_seq[idx3 : idx1 + 1]
         if len(genomic_codon) != 3:
-            return ""
+            return {"aa_change": "", "status": None}
             
         wt_codon = "".join(COMPLEMENT.get(b, b) for b in reversed(genomic_codon))
         
@@ -291,11 +575,11 @@ def get_aa_change(pos, ref, alt, gene, ref_seq):
         aa_pos = codon_index + 1
         
         if wt_aa == "?" or mut_aa == "?":
-            return ""
+            return {"aa_change": "", "status": None}
         if wt_aa == mut_aa:
-            return f"{wt_aa}{aa_pos}{mut_aa} (syn)"
+            return {"aa_change": f"{wt_aa}{aa_pos}{mut_aa} (syn)", "status": None}
         else:
-            return f"{wt_aa}{aa_pos}{mut_aa}"
+            return {"aa_change": f"{wt_aa}{aa_pos}{mut_aa}", "status": None}
 
 def parse_vcf(vcf_path, genes_annotation, ref_seqs=None, min_freq=0.2):
     """Parse VCF file for variants and intersect with GFF genes to find effects, grouping by reference."""
@@ -342,20 +626,43 @@ def parse_vcf(vcf_path, genes_annotation, ref_seqs=None, min_freq=0.2):
             if af < min_freq:
                 continue
                 
-            # Intersect with GFF genes
-            effect_gene = "Intergenic"
-            effect_type = "Non-coding"
-            aa_change = ""
+            # Intersect with GFF genes (supporting overlapping reading frames)
             ref_genes = genes_annotation.get(ref_chrom, [])
-            for gene in ref_genes:
-                if gene["type"] in ["gene", "CDS"] and gene["start"] <= pos <= gene["end"]:
-                    effect_gene = gene["name"]
-                    effect_type = "Coding"
-                    if ref_seqs:
-                        aa_change = get_aa_change(pos, ref, alt, gene, ref_seqs.get(ref_chrom, ""))
-                    break
+            matching_genes = [g for g in ref_genes if g["type"] in ["gene", "CDS"] and g["start"] <= pos <= g["end"]]
+            
+            if not matching_genes:
+                effect_gene = "Intergenic"
+                effect_type = "Non-coding"
+                aa_change = ""
+                status = None
+            elif len(matching_genes) == 1:
+                gene = matching_genes[0]
+                effect_gene = gene["name"]
+                effect_type = "Coding"
+                if ref_seqs:
+                    res = get_aa_change(pos, ref, alt, gene, ref_seqs.get(ref_chrom, ""))
+                    aa_change = res["aa_change"]
+                    status = res["status"]
+                else:
+                    aa_change = ""
+                    status = None
+            else:
+                effect_type = "Coding"
+                gene_names = list(dict.fromkeys(g["name"] for g in matching_genes))
+                effect_gene = "/".join(gene_names)
+                aa_changes = []
+                statuses = []
+                if ref_seqs:
+                    for gene in matching_genes:
+                        res = get_aa_change(pos, ref, alt, gene, ref_seqs.get(ref_chrom, ""))
+                        if res["aa_change"] and res["aa_change"] not in aa_changes:
+                            aa_changes.append(res["aa_change"])
+                        if res["status"] and res["status"] not in statuses:
+                            statuses.append(res["status"])
+                aa_change = "/".join(aa_changes) if aa_changes else ""
+                status = statuses[0] if statuses else None
                     
-            variants.append({
+            var_dict = {
                 "reference": ref_chrom,
                 "position": pos,
                 "ref": ref,
@@ -366,7 +673,10 @@ def parse_vcf(vcf_path, genes_annotation, ref_seqs=None, min_freq=0.2):
                 "gene": effect_gene,
                 "type": effect_type,
                 "aa_change": aa_change
-            })
+            }
+            if status:
+                var_dict["status"] = status
+            variants.append(var_dict)
             
     return variants
 
@@ -467,7 +777,7 @@ def parse_and_calculate_amplicons(primer_bed_path, amplicons_bed_path, depths, m
         
     if primer_bed_path and os.path.exists(primer_bed_path):
         import re
-        suffix_pat = re.compile(r'_(LEFT|RIGHT|FORWARD|REVERSE|F|R|L|R|left|right|forward|reverse|f|r)(_alt\d*)?$', re.IGNORECASE)
+        suffix_pat = re.compile(r'[-_](LEFT|RIGHT|FORWARD|REVERSE|F|R|L|R|left|right|forward|reverse|f|r)(_alt\d*)?$', re.IGNORECASE)
         primers = defaultdict(list)
         
         with open(primer_bed_path, 'r') as f:
@@ -549,6 +859,8 @@ def calculate_distance_matrices(samples_data, ref_info, min_cov):
     distance_matrices = {}
     samples_list = list(samples_data.values())
     num_samples = len(samples_list)
+    distance_matrix_order = [s["sample_id"] for s in samples_list]
+    distance_matrices_by_name = {}
     
     for ref in ref_info:
         ref_name = ref["name"]
@@ -562,37 +874,73 @@ def calculate_distance_matrices(samples_data, ref_info, min_cov):
         for i in range(num_samples):
             sA = samples_list[i]
             depths_A = sA.get("full_depths", {}).get(ref_name, [0] * ref_len)
-            # Map of positions (1-indexed) to their alternative alleles (SNPs only)
-            vars_A = {v["position"]: v["alt"] for v in sA.get("variants", []) if v["reference"] == ref_name and len(v["ref"]) == 1 and len(v["alt"]) == 1}
+            # Map of positions (1-indexed) to their alternative alleles (major consensus SNPs only)
+            vars_A = {
+                v["position"]: v["alt"] 
+                for v in sA.get("variants", []) 
+                if v["reference"] == ref_name and len(v["ref"]) == 1 and len(v["alt"]) == 1 and v.get("frequency", 1.0) >= 0.5
+            }
+            
+            # Track positions deleted in sample A to exclude from SNP comparison
+            del_positions_A = set()
+            for v in sA.get("variants", []):
+                if v["reference"] == ref_name and len(v["ref"]) > len(v["alt"]) and v.get("frequency", 1.0) >= 0.5:
+                    start_del = v["position"] + len(v["alt"])
+                    end_del = v["position"] + len(v["ref"]) - 1
+                    del_positions_A.update(range(start_del, end_del + 1))
             
             for j in range(i + 1, num_samples):
                 sB = samples_list[j]
                 depths_B = sB.get("full_depths", {}).get(ref_name, [0] * ref_len)
-                vars_B = {v["position"]: v["alt"] for v in sB.get("variants", []) if v["reference"] == ref_name and len(v["ref"]) == 1 and len(v["alt"]) == 1}
+                vars_B = {
+                    v["position"]: v["alt"] 
+                    for v in sB.get("variants", []) 
+                    if v["reference"] == ref_name and len(v["ref"]) == 1 and len(v["alt"]) == 1 and v.get("frequency", 1.0) >= 0.5
+                }
+                
+                del_positions_B = set()
+                for v in sB.get("variants", []):
+                    if v["reference"] == ref_name and len(v["ref"]) > len(v["alt"]) and v.get("frequency", 1.0) >= 0.5:
+                        start_del = v["position"] + len(v["alt"])
+                        end_del = v["position"] + len(v["ref"]) - 1
+                        del_positions_B.update(range(start_del, end_del + 1))
                 
                 diffs = 0
                 compared = 0
                 
                 for pos_idx in range(ref_len):
+                    pos = pos_idx + 1
+                    
+                    # Skip positions deleted in either sample so deletions are not falsely counted as reference matches
+                    if pos in del_positions_A or pos in del_positions_B:
+                        continue
+                        
                     depth_A = depths_A[pos_idx]
                     depth_B = depths_B[pos_idx]
                     
                     # Only compare if both samples have sufficient coverage depth
                     if depth_A >= min_cov and depth_B >= min_cov:
                         compared += 1
-                        pos = pos_idx + 1
                         base_A = vars_A.get(pos, ref_seq[pos_idx])
                         base_B = vars_B.get(pos, ref_seq[pos_idx])
                         if base_A.upper() != base_B.upper():
                             diffs += 1
                             
-                dist = diffs / compared if compared > 0 else 0.0
+                dist = diffs / compared if compared > 0 else 1.0
                 matrix[i][j] = dist
                 matrix[j][i] = dist
                 
         distance_matrices[ref_name] = matrix
         
-    return distance_matrices
+        # Construct name-keyed distance map for ref_name
+        ref_by_name = {}
+        for i, sA_id in enumerate(distance_matrix_order):
+            ref_by_name[sA_id] = {}
+            for j, sB_id in enumerate(distance_matrix_order):
+                ref_by_name[sA_id][sB_id] = matrix[i][j]
+        distance_matrices_by_name[ref_name] = ref_by_name
+        
+    return distance_matrices, distance_matrix_order, distance_matrices_by_name
 
 def validate_report_schema(report):
     """
@@ -603,7 +951,7 @@ def validate_report_schema(report):
     if not isinstance(report, dict):
         raise ValueError("Schema Error: Report must be a JSON object dictionary.")
         
-    required_top = ["run_id", "min_coverage_threshold", "references", "genes", "distance_matrices", "samples"]
+    required_top = ["run_id", "min_coverage_threshold", "references", "genes", "distance_matrices", "distance_matrix_order", "distance_matrices_by_name", "samples"]
     for key in required_top:
         if key not in report:
             raise ValueError(f"Schema Error: Report missing required top-level key '{key}'.")
@@ -618,6 +966,22 @@ def validate_report_schema(report):
         raise ValueError("Schema Error: 'genes' must be an object dictionary.")
     if not isinstance(report["distance_matrices"], dict):
         raise ValueError("Schema Error: 'distance_matrices' must be an object dictionary.")
+    if not isinstance(report["distance_matrix_order"], list):
+        raise ValueError("Schema Error: 'distance_matrix_order' must be a list.")
+    for idx, val in enumerate(report["distance_matrix_order"]):
+        if not isinstance(val, str):
+            raise ValueError(f"Schema Error: 'distance_matrix_order' entry at index {idx} must be a string.")
+    if not isinstance(report["distance_matrices_by_name"], dict):
+        raise ValueError("Schema Error: 'distance_matrices_by_name' must be an object dictionary.")
+    for ref_name, matrix_dict in report["distance_matrices_by_name"].items():
+        if not isinstance(matrix_dict, dict):
+            raise ValueError(f"Schema Error: 'distance_matrices_by_name' for ref '{ref_name}' must be a dictionary.")
+        for sA_id, sB_dict in matrix_dict.items():
+            if not isinstance(sB_dict, dict):
+                raise ValueError(f"Schema Error: 'distance_matrices_by_name' entry for ref '{ref_name}', sample '{sA_id}' must be a dictionary.")
+            for sB_id, dist in sB_dict.items():
+                if not isinstance(dist, (int, float)):
+                    raise ValueError(f"Schema Error: 'distance_matrices_by_name' distance for ref '{ref_name}', samples '{sA_id}' vs '{sB_id}' must be a number.")
     if not isinstance(report["samples"], list):
         raise ValueError("Schema Error: 'samples' must be a list.")
         
@@ -666,7 +1030,7 @@ def validate_report_schema(report):
         for ref_name, cov_data in coverage.items():
             if not isinstance(cov_data, dict):
                 raise ValueError(f"Schema Error: Sample '{s_id}' coverage data for ref '{ref_name}' must be a dictionary.")
-            required_cov = ["mean_depth", "coverage_breadth_10x", "coverage_breadth_30x", "mapped_reads", "coverage_profile"]
+            required_cov = ["mean_depth", "coverage_breadth_10x", "coverage_breadth_30x", "coverage_breadth_min_cov", "mapped_reads", "coverage_profile"]
             for key in required_cov:
                 if key not in cov_data:
                     raise ValueError(f"Schema Error: Sample '{s_id}' coverage for ref '{ref_name}' missing key '{key}'.")
@@ -676,6 +1040,8 @@ def validate_report_schema(report):
                 raise ValueError(f"Schema Error: Sample '{s_id}' coverage breadth_10x for ref '{ref_name}' must be a number.")
             if not isinstance(cov_data["coverage_breadth_30x"], (int, float)):
                 raise ValueError(f"Schema Error: Sample '{s_id}' coverage breadth_30x for ref '{ref_name}' must be a number.")
+            if not isinstance(cov_data["coverage_breadth_min_cov"], (int, float)):
+                raise ValueError(f"Schema Error: Sample '{s_id}' coverage breadth_min_cov for ref '{ref_name}' must be a number.")
             if not isinstance(cov_data["mapped_reads"], (int, float)):
                 raise ValueError(f"Schema Error: Sample '{s_id}' coverage mapped_reads for ref '{ref_name}' must be a number.")
             if not isinstance(cov_data["coverage_profile"], list):
@@ -760,7 +1126,7 @@ def main():
             )
 
     # Calculate pairwise distance matrices on pipeline side (SNP-only, frame-shift-proof)
-    distance_matrices = calculate_distance_matrices(samples_data, ref_info, args.min_coverage)
+    distance_matrices, distance_matrix_order, distance_matrices_by_name = calculate_distance_matrices(samples_data, ref_info, args.min_coverage)
     
     # Remove bulky full_depths maps to keep JSON report file size compact
     for s in samples_data.values():
@@ -774,6 +1140,8 @@ def main():
         "references": ref_info,
         "genes": genes,
         "distance_matrices": distance_matrices,
+        "distance_matrix_order": distance_matrix_order,
+        "distance_matrices_by_name": distance_matrices_by_name,
         "samples": list(samples_data.values())
     }
     

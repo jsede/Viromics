@@ -26,6 +26,7 @@ import GeneMap from './components/GeneMap';
 import MutationMatrix from './components/MutationMatrix';
 import VariantTable from './components/VariantTable';
 import PhylogeneticTree from './components/PhylogeneticTree';
+import ErrorBoundary from './components/ErrorBoundary';
 
 export default function App() {
   const [reportData, setReportData] = useState(null);
@@ -239,11 +240,19 @@ export default function App() {
       cov = cov[refName];
     }
     
-    const breadth = cov.coverage_breadth_10x !== undefined ? cov.coverage_breadth_10x : 0;
-    const reads = sample.qc.trimmed_reads;
+    let cons = sample.consensus;
+    if (cons && cons[refName]) {
+      cons = cons[refName];
+    } else {
+      cons = cons || {};
+    }
     
-    if (breadth >= 95 && reads >= 5000) return 'PASS';
-    if (breadth >= 80 && reads >= 2000) return 'WARN';
+    const breadth = cov.coverage_breadth_10x !== undefined ? cov.coverage_breadth_10x : 0;
+    const depth = cov.mean_depth !== undefined ? cov.mean_depth : 0;
+    const n_content = cons.n_content !== undefined ? cons.n_content : 0;
+    
+    if (depth >= 100 && breadth >= 95 && n_content <= 5) return 'PASS';
+    if (depth >= 25 && breadth >= 80 && n_content <= 10) return 'WARN';
     return 'FAIL';
   };
 
@@ -346,13 +355,17 @@ export default function App() {
       const covB = refB && b.coverage ? (b.coverage[refB.name] ? b.coverage[refB.name].mean_depth : b.coverage.mean_depth) : 0;
       valA = covA || 0;
       valB = covB || 0;
-    } else if (sortField === 'coverage_breadth_10x') {
+    } else if (sortField === 'coverage_breadth' || sortField === 'coverage_breadth_10x') {
       const refA = getBestReference(a);
       const refB = getBestReference(b);
-      const covA = refA && a.coverage ? (a.coverage[refA.name] ? a.coverage[refA.name].coverage_breadth_10x : a.coverage.coverage_breadth_10x) : 0;
-      const covB = refB && b.coverage ? (b.coverage[refB.name] ? b.coverage[refB.name].coverage_breadth_10x : b.coverage.coverage_breadth_10x) : 0;
-      valA = covA || 0;
-      valB = covB || 0;
+      const getBreadth = (s, r) => {
+        if (!s || !s.coverage) return 0;
+        const c = r && s.coverage[r.name] ? s.coverage[r.name] : s.coverage;
+        if (!c) return 0;
+        return c.coverage_breadth_min_cov !== undefined ? c.coverage_breadth_min_cov : (c.coverage_breadth_10x || 0);
+      };
+      valA = getBreadth(a, refA);
+      valB = getBreadth(b, refB);
     } else if (sortField === 'consensus_length') {
       const refA = getBestReference(a);
       const refB = getBestReference(b);
@@ -510,7 +523,8 @@ export default function App() {
 
             {/* TAB CONTENT: RUN OVERVIEW */}
             {activeTab === 'overview' && (
-              <div className="flex flex-col gap-6">
+              <ErrorBoundary componentName="Run Overview">
+                <div className="flex flex-col gap-6">
                 
                 {/* Aggregate Run cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -591,6 +605,20 @@ export default function App() {
                     <p className="text-xs text-gray-400">
                       High-level run comparison metrics across all demultiplexed files
                     </p>
+                    <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1.5 text-[10px] text-slate-400 border-t border-slate-800/40 pt-2 font-normal">
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-brand-emerald"></span>
+                        <strong className="text-slate-300 font-medium">PASS:</strong> &ge; 100x mean depth, &ge; 95% breadth, &le; 5% Ns
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-brand-amber"></span>
+                        <strong className="text-slate-300 font-medium">WARN:</strong> &ge; 25x mean depth, &ge; 80% breadth, &le; 10% Ns
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-brand-rose"></span>
+                        <strong className="text-slate-300 font-medium">FAIL:</strong> &lt; 25x depth, &lt; 80% breadth, or &gt; 10% Ns
+                      </span>
+                    </div>
                   </div>
                   
                   <div className="overflow-x-auto border border-dark-border rounded-xl bg-dark-bg/40 max-w-full">
@@ -617,19 +645,19 @@ export default function App() {
                               Mean Depth <ArrowUpDown className="w-3 h-3 text-brand-teal/70" />
                             </div>
                           </th>
-                          <th className="p-4 font-semibold font-outfit cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('coverage_breadth_10x')}>
+                          <th className="p-4 font-semibold font-outfit cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('coverage_breadth')}>
                             <div className="flex items-center gap-1">
                               Cov Breadth (≥{minCovThreshold}x) <ArrowUpDown className="w-3 h-3 text-brand-teal/70" />
-                            </div>
-                          </th>
-                          <th className="p-4 font-semibold font-outfit cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('consensus_length')}>
-                            <div className="flex items-center gap-1">
-                              Consensus Length <ArrowUpDown className="w-3 h-3 text-brand-teal/70" />
                             </div>
                           </th>
                           <th className="p-4 font-semibold font-outfit cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('n_content')}>
                             <div className="flex items-center gap-1">
                               N Content <ArrowUpDown className="w-3 h-3 text-brand-teal/70" />
+                            </div>
+                          </th>
+                          <th className="p-4 font-semibold font-outfit cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('consensus_length')}>
+                            <div className="flex items-center gap-1">
+                              Consensus Length <ArrowUpDown className="w-3 h-3 text-brand-teal/70" />
                             </div>
                           </th>
                           <th className="p-4 font-semibold font-outfit cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('snps_called')}>
@@ -652,6 +680,10 @@ export default function App() {
                           const cons = (bestRef && sample.consensus && sample.consensus[bestRef.name]) ? sample.consensus[bestRef.name] : (sample.consensus || {});
                           const coDetections = getCoDetections(sample);
                           const totalSNPs = sample.variants ? sample.variants.length : 0;
+                          
+                          const breadth = cov.coverage_breadth_min_cov !== undefined ? cov.coverage_breadth_min_cov : (cov.coverage_breadth_10x !== undefined ? cov.coverage_breadth_10x : 0);
+                          const depth = cov.mean_depth !== undefined ? cov.mean_depth : 0;
+                          const n_content = cons.n_content !== undefined ? cons.n_content : 0;
                           
                           return (
                             <tr 
@@ -686,19 +718,23 @@ export default function App() {
                                   return `${mr.toLocaleString()} (${pct}%)`;
                                 })()}
                               </td>
-                              <td className="p-4 font-mono text-gray-300 font-semibold">
+                              <td className={`p-4 font-mono font-semibold ${
+                                depth >= 100 ? 'text-brand-emerald' : depth >= 25 ? 'text-brand-amber' : 'text-brand-rose'
+                              }`}>
                                 {cov.mean_depth !== undefined ? cov.mean_depth.toLocaleString() : 0}x
                               </td>
-                              <td className="p-4 font-mono text-brand-teal font-bold">
-                                {cov.coverage_breadth_10x !== undefined ? cov.coverage_breadth_10x.toFixed(2) : '0.00'}%
+                              <td className={`p-4 font-mono font-bold ${
+                                breadth >= 95 ? 'text-brand-emerald' : breadth >= 80 ? 'text-brand-amber' : 'text-brand-rose'
+                              }`}>
+                                {breadth.toFixed(2)}%
+                              </td>
+                              <td className={`p-4 font-mono font-bold ${
+                                n_content <= 5 ? 'text-brand-emerald' : n_content <= 10 ? 'text-brand-amber' : 'text-brand-rose'
+                              }`}>
+                                {cons.n_content !== undefined ? cons.n_content.toFixed(2) : '0.00'}%
                               </td>
                               <td className="p-4 font-mono text-gray-300">
                                 {cons.length !== undefined ? cons.length.toLocaleString() : 0} bp
-                              </td>
-                              <td className={`p-4 font-mono font-bold ${
-                                cons.n_content > 5 ? 'text-brand-rose' : 'text-gray-400'
-                              }`}>
-                                {cons.n_content !== undefined ? cons.n_content.toFixed(2) : '0.00'}%
                               </td>
                               <td className="p-4 font-mono text-gray-300">
                                 {totalSNPs}
@@ -706,18 +742,64 @@ export default function App() {
                               <td className="p-4 text-center">
                                 <div className="inline-flex justify-center">
                                   {status === 'PASS' && (
-                                    <span className="flex items-center gap-1 text-[10px] font-bold text-brand-emerald bg-brand-emerald/15 px-2 py-0.5 rounded-full border border-brand-emerald/20">
+                                    <span className="relative group cursor-help flex items-center gap-1 text-[10px] font-bold text-brand-emerald bg-brand-emerald/15 px-2 py-0.5 rounded-full border border-brand-emerald/20 select-none">
                                       <CheckCircle2 className="w-3 h-3" /> PASS
+                                      <div className="absolute right-full top-1/2 -translate-y-1/2 mr-3 hidden group-hover:block z-50 w-60 p-3 bg-slate-900 border border-slate-700 text-slate-200 rounded-xl shadow-2xl text-left font-normal leading-relaxed select-text status-tooltip" onClick={(e) => e.stopPropagation()}>
+                                        <div className="font-bold text-white mb-2 text-xs uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-800/80 pb-1.5">
+                                          <CheckCircle2 className="w-4 h-4 text-brand-emerald" />
+                                          <span>PASS</span>
+                                        </div>
+                                        <div className="text-[10px] space-y-1">
+                                          <p className="text-slate-300">Sample meets all quality guidelines:</p>
+                                          <ul className="list-disc pl-4 space-y-0.5">
+                                            <li>Mean depth &ge; 100x <span className="text-slate-400">({depth.toLocaleString()}x actual)</span></li>
+                                            <li>Coverage breadth &ge; 95% <span className="text-slate-400">({breadth.toFixed(1)}% actual)</span></li>
+                                            <li>Consensus N Content &le; 5% <span className="text-slate-400">({n_content.toFixed(1)}% actual)</span></li>
+                                          </ul>
+                                        </div>
+                                        <div className="absolute left-full top-1/2 -translate-y-1/2 w-2 h-2 bg-slate-900 border-t border-r border-slate-700 rotate-45 -ml-1"></div>
+                                      </div>
                                     </span>
                                   )}
                                   {status === 'WARN' && (
-                                    <span className="flex items-center gap-1 text-[10px] font-bold text-brand-amber bg-brand-amber/15 px-2 py-0.5 rounded-full border border-brand-amber/20">
+                                    <span className="relative group cursor-help flex items-center gap-1 text-[10px] font-bold text-brand-amber bg-brand-amber/15 px-2 py-0.5 rounded-full border border-brand-amber/20 select-none">
                                       <AlertTriangle className="w-3 h-3" /> WARN
+                                      <div className="absolute right-full top-1/2 -translate-y-1/2 mr-3 hidden group-hover:block z-50 w-60 p-3 bg-slate-900 border border-slate-700 text-slate-200 rounded-xl shadow-2xl text-left font-normal leading-relaxed select-text status-tooltip" onClick={(e) => e.stopPropagation()}>
+                                        <div className="font-bold text-white mb-2 text-xs uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-800/80 pb-1.5">
+                                          <AlertTriangle className="w-4 h-4 text-brand-amber" />
+                                          <span>WARNING</span>
+                                        </div>
+                                        <div className="text-[10px] space-y-1">
+                                          <p className="text-slate-300">Below PASS threshold but meets minimal guidelines:</p>
+                                          <ul className="list-disc pl-4 space-y-0.5">
+                                            <li>Mean depth &ge; 25x <span className="text-slate-400">({depth.toLocaleString()}x actual)</span></li>
+                                            <li>Coverage breadth &ge; 80% <span className="text-slate-400">({breadth.toFixed(1)}% actual)</span></li>
+                                            <li>Consensus N Content &le; 10% <span className="text-slate-400">({n_content.toFixed(1)}% actual)</span></li>
+                                          </ul>
+                                        </div>
+                                        <div className="absolute left-full top-1/2 -translate-y-1/2 w-2 h-2 bg-slate-900 border-t border-r border-slate-700 rotate-45 -ml-1"></div>
+                                      </div>
                                     </span>
                                   )}
                                   {status === 'FAIL' && (
-                                    <span className="flex items-center gap-1 text-[10px] font-bold text-brand-rose bg-brand-rose/15 px-2 py-0.5 rounded-full border border-brand-rose/20">
+                                    <span className="relative group cursor-help flex items-center gap-1 text-[10px] font-bold text-brand-rose bg-brand-rose/15 px-2 py-0.5 rounded-full border border-brand-rose/20 select-none">
                                       <XCircle className="w-3 h-3" /> FAIL
+                                      <div className="absolute right-full top-1/2 -translate-y-1/2 mr-3 hidden group-hover:block z-50 w-60 p-3 bg-slate-900 border border-slate-700 text-slate-200 rounded-xl shadow-2xl text-left font-normal leading-relaxed select-text status-tooltip" onClick={(e) => e.stopPropagation()}>
+                                        <div className="font-bold text-white mb-2 text-xs uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-800/80 pb-1.5">
+                                          <XCircle className="w-4 h-4 text-brand-rose" />
+                                          <span>FAIL</span>
+                                        </div>
+                                        <div className="text-[10px] space-y-1">
+                                          <p className="text-slate-300">Does not meet minimal quality guidelines:</p>
+                                          <ul className="list-disc pl-4 space-y-0.5">
+                                            <li>Mean depth &lt; 25x, Coverage &lt; 80%, or Ns &gt; 10%</li>
+                                            <li className="text-slate-400">Actual mean depth: {depth.toLocaleString()}x</li>
+                                            <li className="text-slate-400">Actual coverage: {breadth.toFixed(1)}%</li>
+                                            <li className="text-slate-400">Actual N content: {n_content.toFixed(1)}%</li>
+                                          </ul>
+                                        </div>
+                                        <div className="absolute left-full top-1/2 -translate-y-1/2 w-2 h-2 bg-slate-900 border-t border-r border-slate-700 rotate-45 -ml-1"></div>
+                                      </div>
                                     </span>
                                   )}
                                 </div>
@@ -730,10 +812,13 @@ export default function App() {
                   </div>
                 </div>
               </div>
-            )}
+            </ErrorBoundary>
+          )}
 
              {/* TAB CONTENT: SAMPLE DETAILS */}
-            {activeTab === 'details' && (() => {
+            {activeTab === 'details' && (
+              <ErrorBoundary componentName="Sample Details">
+                {(() => {
               const refs = getReferencesList();
               const activeCov = (selectedRefName && activeSample.coverage && activeSample.coverage[selectedRefName]) ? activeSample.coverage[selectedRefName] : (activeSample.coverage || {});
               const activeCons = (selectedRefName && activeSample.consensus && activeSample.consensus[selectedRefName]) ? activeSample.consensus[selectedRefName] : (activeSample.consensus || {});
@@ -804,7 +889,12 @@ export default function App() {
                       </strong>
                       <span className="text-gray-600">|</span>
                       <span className="text-gray-400">Mean Alignment Depth:</span>
-                      <strong className="text-brand-teal font-mono text-xs">{activeCov.mean_depth !== undefined ? activeCov.mean_depth : 0}x</strong>
+                      <strong className={`font-mono text-xs ${
+                        (() => {
+                          const depth = activeCov.mean_depth !== undefined ? activeCov.mean_depth : 0;
+                          return depth >= 100 ? 'text-brand-emerald' : depth >= 25 ? 'text-brand-amber' : 'text-brand-rose';
+                        })()
+                      }`}>{activeCov.mean_depth !== undefined ? activeCov.mean_depth : 0}x</strong>
                       <span className="text-gray-600">|</span>
                       <span className="text-gray-400">GC:</span>
                       <strong className="text-white font-mono text-xs">{activeCons.gc_content !== undefined ? activeCons.gc_content : 0}%</strong>
@@ -846,31 +936,43 @@ export default function App() {
                 </div>
               );
             })()}
+              </ErrorBoundary>
+            )}
 
             {/* TAB CONTENT: MUTATIONAL SHARING */}
             {activeTab === 'matrix' && (
-              <MutationMatrix 
-                samples={reportData.samples} 
-                selectedRefName={selectedRefName} 
-                setSelectedRefName={setSelectedRefName}
-                refs={getReferencesList()}
-              />
+              <ErrorBoundary componentName="Mutational Sharing">
+                <MutationMatrix 
+                  samples={reportData.samples} 
+                  selectedRefName={selectedRefName} 
+                  setSelectedRefName={setSelectedRefName}
+                  refs={getReferencesList()}
+                  minCoverageThreshold={minCovThreshold}
+                />
+              </ErrorBoundary>
             )}
 
             {/* TAB CONTENT: PHYLOGENETIC TREE */}
             {activeTab === 'tree' && (
-              <PhylogeneticTree 
-                samples={reportData.samples} 
-                selectedRefName={selectedRefName} 
-                setSelectedRefName={setSelectedRefName}
-                refs={getReferencesList()}
-                distanceMatrices={reportData.distance_matrices}
-              />
+              <ErrorBoundary componentName="Phylogenetic Tree">
+                <PhylogeneticTree 
+                  samples={reportData.samples} 
+                  selectedRefName={selectedRefName} 
+                  setSelectedRefName={setSelectedRefName}
+                  refs={getReferencesList()}
+                  distanceMatrices={reportData.distance_matrices}
+                  distanceMatrixOrder={reportData.distance_matrix_order}
+                  minCoverageThreshold={minCovThreshold}
+                />
+              </ErrorBoundary>
             )}
             {/* TAB CONTENT: GENOMICS PDF REPORT */}
-            {activeTab === 'report' && (() => {
+            {activeTab === 'report' && (
+              <ErrorBoundary componentName="Genomics Report">
+                {(() => {
               const refs = getReferencesList();
-              const pdfRefName = selectedRefName || (refs.length > 0 ? refs[0].name : '');
+              const bestRef = getBestReference(activeSample);
+              const pdfRefName = bestRef ? bestRef.name : (refs.length > 0 ? refs[0].name : '');
               const pdfCov = (pdfRefName && activeSample.coverage && activeSample.coverage[pdfRefName]) ? activeSample.coverage[pdfRefName] : (activeSample.coverage || {});
               const pdfCons = (pdfRefName && activeSample.consensus && activeSample.consensus[pdfRefName]) ? activeSample.consensus[pdfRefName] : (activeSample.consensus || {});
               const pdfRefLabel = reportData.reference ? reportData.reference.name : pdfRefName;
@@ -917,7 +1019,7 @@ export default function App() {
                     <div className="flex items-start justify-between border-b border-gray-200 pb-6">
                       <div className="flex flex-col gap-1.5">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-teal-600 font-sans">Genomic Epidemiology Report</span>
-                        <h2 className="text-2xl font-bold font-outfit text-slate-900 leading-none">Pathogen genomic sequencing</h2>
+                        <h2 className="text-2xl font-bold font-outfit text-slate-900 leading-none">Pathogen genomics summary</h2>
                         <span className="text-xs text-slate-500 font-mono mt-1">Report ID: VMR-{activeSample.sample_id}-{Date.now().toString().slice(-6)}</span>
                       </div>
                       <div className="flex flex-col items-end text-right gap-1 text-xs">
@@ -945,7 +1047,7 @@ export default function App() {
                           {coDetections.length > 1 
                             ? `${coDetections.map(c => {
                                 const cons = activeSample.consensus && activeSample.consensus[c];
-                                return cons ? `${cons.length} bp (${c.split('_')[0]})` : '';
+                                return cons ? `${cons.length} bp (${c})` : '';
                               }).filter(Boolean).join(' | ')}`
                             : `${pdfCons.length !== undefined ? pdfCons.length.toLocaleString() : 0} bp`
                           }
@@ -977,17 +1079,24 @@ export default function App() {
                                 const mr = getMappedReadsForSampleRef(activeSample, c);
                                 const filtered = activeSample.qc?.trimmed_reads || 0;
                                 const pct = filtered > 0 ? ((mr / filtered) * 100).toFixed(1) : '0.0';
+                                const depth = cov.mean_depth !== undefined ? cov.mean_depth : 0;
+                                const breadth = cov.coverage_breadth_10x !== undefined ? cov.coverage_breadth_10x : 0;
+                                const n_content = cons.n_content !== undefined ? cons.n_content : 0;
                                 return (
                                   <tr key={c} className="border-b border-slate-100 text-slate-700">
                                     <td className="p-3 font-semibold text-slate-800">{c}</td>
                                     <td className="p-3 font-mono font-medium text-slate-900">
                                       {mr.toLocaleString()} ({pct}% of {filtered.toLocaleString()})
                                     </td>
-                                    <td className="p-3 font-mono">{cov.mean_depth !== undefined ? cov.mean_depth : 0}x</td>
-                                    <td className="p-3 font-mono text-teal-600 font-bold">{cov.coverage_breadth_10x !== undefined ? cov.coverage_breadth_10x.toFixed(2) : '0.00'}%</td>
-                                    <td className={`p-3 font-mono font-bold ${cons.n_content > 5 ? 'text-red-500' : 'text-slate-500'}`}>
-                                      {cons.n_content !== undefined ? cons.n_content.toFixed(2) : '0.00'}%
-                                    </td>
+                                    <td className={`p-3 font-mono font-semibold ${
+                                      depth >= 100 ? 'text-brand-emerald' : depth >= 25 ? 'text-brand-amber' : 'text-brand-rose'
+                                    }`}>{depth.toLocaleString()}x</td>
+                                    <td className={`p-3 font-mono font-bold ${
+                                      breadth >= 95 ? 'text-brand-emerald' : breadth >= 80 ? 'text-brand-amber' : 'text-brand-rose'
+                                    }`}>{breadth.toFixed(2)}%</td>
+                                    <td className={`p-3 font-mono font-bold ${
+                                      n_content <= 5 ? 'text-brand-emerald' : n_content <= 10 ? 'text-brand-amber' : 'text-brand-rose'
+                                    }`}>{n_content.toFixed(2)}%</td>
                                     <td className="p-3 text-center">
                                       <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold ${
                                         status === 'PASS' ? 'bg-emerald-100 text-emerald-700' :
@@ -1027,77 +1136,131 @@ export default function App() {
                           </div>
                           <div className="p-3 border border-slate-100 rounded-xl bg-slate-50">
                             <span className="text-[9px] uppercase font-bold text-slate-400 block">Mean Alignment Depth</span>
-                            <strong className="text-md text-teal-600 font-semibold font-mono">{pdfCov.mean_depth !== undefined ? pdfCov.mean_depth : 0}x</strong>
+                            <strong className={`text-md font-semibold font-mono ${
+                              (() => {
+                                const depth = pdfCov.mean_depth !== undefined ? pdfCov.mean_depth : 0;
+                                return depth >= 100 ? 'text-brand-emerald' : depth >= 25 ? 'text-brand-amber' : 'text-brand-rose';
+                              })()
+                            }`}>{pdfCov.mean_depth !== undefined ? pdfCov.mean_depth.toLocaleString() : 0}x</strong>
                           </div>
                           <div className="p-3 border border-slate-100 rounded-xl bg-slate-50">
                             <span className="text-[9px] uppercase font-bold text-slate-400 block">Coverage Breadth (≥{minCovThreshold}x)</span>
-                            <strong className="text-md text-teal-600 font-semibold font-mono">{pdfCov.coverage_breadth_10x !== undefined ? pdfCov.coverage_breadth_10x : 0}%</strong>
+                            <strong className={`text-md font-bold font-mono ${
+                              (() => {
+                                const breadth = pdfCov.coverage_breadth_min_cov !== undefined ? pdfCov.coverage_breadth_min_cov : (pdfCov.coverage_breadth_10x !== undefined ? pdfCov.coverage_breadth_10x : 0);
+                                return breadth >= 95 ? 'text-brand-emerald' : breadth >= 80 ? 'text-brand-amber' : 'text-brand-rose';
+                              })()
+                            }`}>{(() => {
+                              const breadth = pdfCov.coverage_breadth_min_cov !== undefined ? pdfCov.coverage_breadth_min_cov : (pdfCov.coverage_breadth_10x !== undefined ? pdfCov.coverage_breadth_10x : 0);
+                              return breadth.toFixed(2);
+                            })()}%</strong>
                           </div>
                           <div className="p-3 border border-slate-100 rounded-xl bg-slate-50">
                             <span className="text-[9px] uppercase font-bold text-slate-400 block">Consensus N Rate</span>
-                            <strong className={`text-md font-semibold font-mono ${
-                              pdfCons.n_content > 5 ? 'text-red-500' : 'text-slate-800'
-                            }`}>{pdfCons.n_content !== undefined ? pdfCons.n_content : 0}%</strong>
+                            <strong className={`text-md font-bold font-mono ${
+                              (() => {
+                                const n_content = pdfCons.n_content !== undefined ? pdfCons.n_content : 0;
+                                return n_content <= 5 ? 'text-brand-emerald' : n_content <= 10 ? 'text-brand-amber' : 'text-brand-rose';
+                              })()
+                            }`}>{pdfCons.n_content !== undefined ? pdfCons.n_content.toFixed(2) : '0.00'}%</strong>
                           </div>
                         </div>
                       )}
                     </div>
 
                     {/* Key Variants Called */}
-                    <div>
-                      <h3 className="text-xs font-bold text-slate-900 border-b border-slate-200 pb-2 mb-4 font-outfit">IDENTIFIED MUTATIONS</h3>
-                      <div className="overflow-hidden border border-slate-200 rounded-xl">
-                        <table className="w-full text-left text-xs border-collapse">
-                          <thead>
-                            <tr className="bg-slate-50 border-b border-slate-200 text-slate-500">
-                              {refs.length > 1 && <th className="p-3">Reference Strain</th>}
-                              <th className="p-3">Position</th>
-                              <th className="p-3">Nucleotide Swap</th>
-                              <th className="p-3">Gene Region</th>
-                              <th className="p-3">Protein Change</th>
-                              <th className="p-3">Type</th>
-                              <th className="p-3 text-right">Allele Frequency</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {activeSample.variants && activeSample.variants.length > 0 ? (
-                              activeSample.variants.map((v, i) => (
-                                <tr key={i} className="border-b border-slate-100 text-slate-700">
-                                  {refs.length > 1 && (
-                                    <td className="p-3 font-semibold text-slate-800 font-outfit">
-                                      {v.reference ? v.reference.split('_')[0] : 'All'}
-                                    </td>
+                    <div className="flex flex-col gap-6">
+                      {(() => {
+                        const allVariants = activeSample.variants || [];
+                        
+                        // Define a helper to render a single mutations table
+                        const renderMutationsTable = (titleLabel, filteredVars) => (
+                          <div className="flex flex-col gap-3">
+                            <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                              <h3 className="text-xs font-bold text-slate-900 font-outfit uppercase tracking-wider">
+                                IDENTIFIED MUTATIONS: {titleLabel}
+                              </h3>
+                              <span className="text-[10px] text-slate-500 font-semibold bg-slate-100 px-2 py-0.5 rounded-full">
+                                {filteredVars.length} variants
+                              </span>
+                            </div>
+                            <div className="overflow-hidden border border-slate-200 rounded-xl">
+                              <table className="w-full text-left text-xs border-collapse">
+                                <thead>
+                                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold select-none">
+                                    <th className="p-3 font-medium">Position</th>
+                                    <th className="p-3 font-medium">SNP</th>
+                                    <th className="p-3 font-medium">Gene Region</th>
+                                    <th className="p-3 font-medium">Protein Change</th>
+                                    <th className="p-3 font-medium">Type</th>
+                                    <th className="p-3 text-right font-medium">Allele Frequency</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {filteredVars.length > 0 ? (
+                                    filteredVars.map((v, i) => (
+                                      <tr key={i} className="border-b border-slate-100 text-slate-700 hover:bg-slate-50/40 transition-colors">
+                                        <td className="p-3 font-mono font-medium">{v.position}</td>
+                                        <td className="p-3 font-mono font-bold text-slate-900">{v.ref} &gt; {v.alt}</td>
+                                        <td className="p-3">
+                                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                                            {v.gene}
+                                          </span>
+                                        </td>
+                                        <td className="p-3 font-medium">
+                                          {v.aa_change ? (
+                                            v.aa_change === 'AA annotation unavailable' ? (
+                                              <span className="text-slate-400 font-normal italic">
+                                                AA unavailable{v.status ? ` (${v.status})` : ''}
+                                              </span>
+                                            ) : v.aa_change === 'Indel' ? (
+                                              <span className="text-amber-600 font-normal">Indel</span>
+                                            ) : v.aa_change.includes('(syn)') ? (
+                                              <span className="text-slate-400 font-normal">{v.aa_change.replace(' (syn)', '')} (syn)</span>
+                                            ) : (
+                                              <span className="font-bold text-red-600 font-mono">
+                                                {v.aa_change.split('/').map(a => a.startsWith('p.') ? a : `p.${a}`).join('/')}
+                                              </span>
+                                            )
+                                          ) : v.status ? (
+                                            <span className="text-slate-400 font-normal italic">{v.status}</span>
+                                          ) : (
+                                            <span className="text-slate-400 font-normal">-</span>
+                                          )}
+                                        </td>
+                                        <td className="p-3">{v.type}</td>
+                                        <td className="p-3 font-mono text-right text-teal-600 font-bold">{(v.frequency * 100).toFixed(1)}%</td>
+                                      </tr>
+                                    ))
+                                  ) : (
+                                    <tr>
+                                      <td colSpan={6} className="p-4 text-center text-slate-400 font-normal">
+                                        No variants identified for this reference strain.
+                                      </td>
+                                    </tr>
                                   )}
-                                  <td className="p-3 font-mono font-medium">{v.position}</td>
-                                  <td className="p-3 font-mono font-bold text-slate-900">{v.ref} &gt; {v.alt}</td>
-                                  <td className="p-3">
-                                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">
-                                      {v.gene}
-                                    </span>
-                                  </td>
-                                  <td className="p-3 font-medium">
-                                    {v.aa_change ? (
-                                      v.aa_change.includes('(syn)') ? (
-                                        <span className="text-slate-400 font-normal">{v.aa_change}</span>
-                                      ) : (
-                                        <span className="font-bold text-red-600 font-mono">p.{v.aa_change}</span>
-                                      )
-                                    ) : (
-                                      <span className="text-slate-400 font-normal">-</span>
-                                    )}
-                                  </td>
-                                  <td className="p-3">{v.type}</td>
-                                  <td className="p-3 font-mono text-right text-teal-600 font-bold">{(v.frequency * 100).toFixed(1)}%</td>
-                                </tr>
-                              ))
-                            ) : (
-                              <tr>
-                                <td colSpan={refs.length > 1 ? 7 : 6} className="p-4 text-center text-slate-400">No variants identified in this run.</td>
-                              </tr>
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        );
+
+                        // If co-detections are present (more than one strain matches), render a table for EACH co-detected strain
+                        if (coDetections.length > 1) {
+                          return coDetections.map((c) => {
+                            const strainVars = allVariants.filter(v => v.reference === c);
+                            return (
+                              <div key={c} className="mt-2">
+                                {renderMutationsTable(c, strainVars)}
+                              </div>
+                            );
+                          });
+                        }
+
+                        // Otherwise (single primary strain), render a single table for the best reference
+                        const primaryVars = allVariants.filter(v => !v.reference || v.reference === pdfRefName);
+                        return renderMutationsTable(pdfRefLabel, primaryVars);
+                      })()}
                     </div>
 
                     {/* Signatures */}
@@ -1116,6 +1279,8 @@ export default function App() {
                 </div>
               );
             })()}
+              </ErrorBoundary>
+            )}
 
           </div>
         )}

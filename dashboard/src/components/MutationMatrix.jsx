@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
 import { Layers, HelpCircle, AlertCircle, ArrowUpDown } from 'lucide-react';
 
-export default function MutationMatrix({ samples, selectedRefName, setSelectedRefName, refs = [] }) {
+export default function MutationMatrix({ 
+  samples, 
+  selectedRefName, 
+  setSelectedRefName, 
+  refs = [],
+  minCoverageThreshold = 10
+}) {
   const [hoveredCell, setHoveredCell] = useState(null);
   const [sortAsc, setSortAsc] = useState(true);
 
@@ -9,18 +15,23 @@ export default function MutationMatrix({ samples, selectedRefName, setSelectedRe
     return null;
   }
 
-  // Filter samples into passing (>= 50% coverage breadth) and excluded (< 50%) for the active strain
-  const passingSamples = samples.filter(sample => {
+  const getBreadth = (sample) => {
     const cov = (selectedRefName && sample.coverage && sample.coverage[selectedRefName]) ? sample.coverage[selectedRefName] : (sample.coverage || {});
-    const breadth = cov.coverage_breadth_10x !== undefined ? cov.coverage_breadth_10x : 0;
-    return breadth >= 50.0;
-  });
+    return cov.coverage_breadth_min_cov !== undefined ? cov.coverage_breadth_min_cov : (cov.coverage_breadth_10x !== undefined ? cov.coverage_breadth_10x : 0);
+  };
 
-  const excludedSamples = samples.filter(sample => {
-    const cov = (selectedRefName && sample.coverage && sample.coverage[selectedRefName]) ? sample.coverage[selectedRefName] : (sample.coverage || {});
-    const breadth = cov.coverage_breadth_10x !== undefined ? cov.coverage_breadth_10x : 0;
-    return breadth < 50.0;
-  });
+  const getConsensusSeq = (sample, refName) => {
+    if (!sample || !sample.consensus) return '';
+    const c = (refName && sample.consensus[refName]) ? sample.consensus[refName] : sample.consensus;
+    if (!c) return '';
+    if (typeof c === 'string') return c;
+    if (typeof c.sequence === 'string') return c.sequence;
+    return '';
+  };
+
+  // Filter samples into passing (>= 50% coverage breadth) and excluded (< 50%) for the active strain
+  const passingSamples = samples.filter(sample => getBreadth(sample) >= 50.0);
+  const excludedSamples = samples.filter(sample => getBreadth(sample) < 50.0);
 
   // Sort passing samples alphabetically and numerically
   const sortedPassingSamples = [...passingSamples].sort((a, b) => {
@@ -42,7 +53,8 @@ export default function MutationMatrix({ samples, selectedRefName, setSelectedRe
           alt: v.alt,
           gene: v.gene,
           type: v.type,
-          aa_change: v.aa_change
+          aa_change: v.aa_change,
+          status: v.status
         };
       });
     }
@@ -130,9 +142,17 @@ export default function MutationMatrix({ samples, selectedRefName, setSelectedRe
                         <span className={`text-[9px] mt-0.5 font-bold ${
                           mut.aa_change.includes('(syn)') 
                             ? 'text-gray-500 font-normal' 
+                            : mut.aa_change === 'AA annotation unavailable'
+                            ? 'text-gray-500 font-normal italic'
+                            : mut.aa_change === 'Indel'
+                            ? 'text-brand-amber font-normal'
                             : 'text-brand-teal'
                         }`}>
-                          {mut.aa_change.replace(' (syn)', '')}
+                          {mut.aa_change.includes('(syn)') 
+                            ? mut.aa_change.replace(' (syn)', '') 
+                            : mut.aa_change === 'AA annotation unavailable'
+                            ? 'unavail'
+                            : mut.aa_change}
                         </span>
                       )}
                     </div>
@@ -149,7 +169,7 @@ export default function MutationMatrix({ samples, selectedRefName, setSelectedRe
                 >
                   {/* Sample Row Header */}
                   <td className="p-3 font-semibold text-gray-200 border-r border-dark-border font-outfit truncate max-w-48">
-                    {selectedRefName ? `${sample.sample_id} (${selectedRefName.split('_')[0]})` : sample.sample_id}
+                    {sample.sample_id}
                   </td>
                   
                   {/* Cells for mutations */}
@@ -158,27 +178,41 @@ export default function MutationMatrix({ samples, selectedRefName, setSelectedRe
                     const hasMut = cell !== null;
                     const isHighFreq = hasMut && cell.frequency >= 0.90;
 
+                    // Check if consensus base at position is 'N' (low coverage / uncalled)
+                    const seq = getConsensusSeq(sample, selectedRefName);
+                    const posIdx = mut.position - 1;
+                    const baseAtPos = (seq && posIdx >= 0 && posIdx < seq.length && seq[posIdx]) 
+                      ? seq[posIdx].toUpperCase() 
+                      : null;
+                    const isLowCov = !hasMut && (baseAtPos === 'N' || baseAtPos === '-');
+
                     return (
                       <td 
                         key={mut.id}
                         className="p-1 border-r border-dark-border/40 text-center relative"
-                        onMouseEnter={() => setHoveredCell({ sampleId: sample.sample_id, mutId: mut.id, cell, mut })}
+                        onMouseEnter={() => setHoveredCell({ sampleId: sample.sample_id, mutId: mut.id, cell, mut, isLowCov })}
                         onMouseLeave={() => setHoveredCell(null)}
                       >
                         <div 
                           className={`mx-auto w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-150 ${
-                            !hasMut 
-                              ? 'bg-white border border-dark-border hover:border-gray-400 hover:bg-dark-hover'
-                              : isHighFreq
+                            hasMut 
+                              ? isHighFreq
                                 ? 'bg-brand-teal text-dark-bg font-bold shadow-glow-teal scale-90 border border-brand-teal'
                                 : 'bg-brand-teal/30 text-brand-teal border border-brand-teal/50 scale-95'
+                              : isLowCov
+                                ? 'bg-slate-800/80 border border-slate-700/60 text-slate-500 scale-90'
+                                : 'bg-white border border-dark-border hover:border-gray-400 hover:bg-dark-hover'
                           }`}
                         >
-                          {hasMut && (
+                          {hasMut ? (
                             <span className="text-[10px] font-mono">
                               {Math.round(cell.frequency * 100)}
                             </span>
-                          )}
+                          ) : isLowCov ? (
+                            <span className="text-[9px] font-mono text-slate-400 font-bold">
+                              N
+                            </span>
+                          ) : null}
                         </div>
                       </td>
                     );
@@ -195,7 +229,7 @@ export default function MutationMatrix({ samples, selectedRefName, setSelectedRe
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
           {/* Cell Details Inspector */}
           <div className="p-4 bg-dark-bg/60 border border-dark-border rounded-xl min-h-20">
-            {hoveredCell && hoveredCell.cell ? (
+            {hoveredCell ? (
               <div className="flex flex-col gap-1">
                 <span className="text-[10px] text-gray-400 font-mono">{hoveredCell.sampleId}</span>
                 <div className="flex items-center gap-2 mt-0.5">
@@ -207,23 +241,41 @@ export default function MutationMatrix({ samples, selectedRefName, setSelectedRe
                   </span>
                   {hoveredCell.mut.aa_change && (
                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                      hoveredCell.mut.aa_change.includes('(syn)')
+                      hoveredCell.mut.aa_change.includes('(syn)') || hoveredCell.mut.aa_change === 'AA annotation unavailable'
                         ? 'bg-gray-800 text-gray-400 border border-dark-border'
+                        : hoveredCell.mut.aa_change === 'Indel'
+                        ? 'bg-amber-950/40 text-brand-amber border border-brand-amber/30'
                         : 'bg-brand-indigo/20 text-brand-indigo border border-brand-indigo/30'
                     }`}>
-                      {hoveredCell.mut.aa_change.includes('(syn)') ? `${hoveredCell.mut.aa_change.replace(' (syn)', '')} (Synonymous)` : `p.${hoveredCell.mut.aa_change} (Non-synonymous)`}
+                      {hoveredCell.mut.aa_change.includes('(syn)') 
+                        ? `${hoveredCell.mut.aa_change.replace(' (syn)', '')} (Synonymous)` 
+                        : hoveredCell.mut.aa_change === 'AA annotation unavailable'
+                        ? `AA unavailable${hoveredCell.mut.status ? ` (${hoveredCell.mut.status})` : ''}`
+                        : hoveredCell.mut.aa_change === 'Indel'
+                        ? 'Indel'
+                        : `${hoveredCell.mut.aa_change.split('/').map(a => a.startsWith('p.') ? a : `p.${a}`).join('/')} (Non-synonymous)`}
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-4 text-xs mt-1 text-gray-300">
-                  <span>Allele Freq: <strong className="text-brand-teal font-mono">{(hoveredCell.cell.frequency*100).toFixed(1)}%</strong></span>
-                  <span>Depth: <strong className="text-white font-mono">{hoveredCell.cell.depth}x</strong></span>
-                </div>
+                {hoveredCell.cell ? (
+                  <div className="flex items-center gap-4 text-xs mt-1 text-gray-300">
+                    <span>Allele Freq: <strong className="text-brand-teal font-mono">{(hoveredCell.cell.frequency*100).toFixed(1)}%</strong></span>
+                    <span>Depth: <strong className="text-white font-mono">{hoveredCell.cell.depth}x</strong></span>
+                  </div>
+                ) : hoveredCell.isLowCov ? (
+                  <div className="text-xs mt-1 text-brand-rose">
+                    <span>Low Coverage / Uncalled Region (masked as 'N' in consensus FASTA, &lt;{minCoverageThreshold}x depth)</span>
+                  </div>
+                ) : (
+                  <div className="text-xs mt-1 text-brand-emerald">
+                    <span>Wild Type Reference Allele ({hoveredCell.mut.ref})</span>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="flex items-center gap-2 text-gray-400 text-xs h-full py-2 justify-center">
                 <HelpCircle className="w-4 h-4 text-brand-teal" />
-                <span>Hover over filled cells to inspect mutation details</span>
+                <span>Hover over grid cells to inspect mutation and reference status</span>
               </div>
             )}
           </div>
@@ -240,7 +292,11 @@ export default function MutationMatrix({ samples, selectedRefName, setSelectedRe
             </div>
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 rounded bg-white border border-dark-border" />
-              <span>Wild Type / No Variant</span>
+              <span>Wild Type Reference</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded bg-slate-800 border border-slate-700 flex items-center justify-center text-[9px] font-mono text-slate-400 font-bold">N</div>
+              <span>Low Coverage / Uncalled (&lt;{minCoverageThreshold}x)</span>
             </div>
           </div>
         </div>
@@ -250,15 +306,14 @@ export default function MutationMatrix({ samples, selectedRefName, setSelectedRe
       {excludedSamples.length > 0 && (
         <div className="border border-dark-border/60 bg-dark-bg/20 rounded-xl p-4 flex flex-col gap-2">
           <span className="text-xs font-semibold text-brand-rose uppercase tracking-wider font-outfit block">
-            Excluded Low-Coverage Samples (&lt;50% Breadth)
+            Excluded Low-Coverage Samples (&lt;50% Breadth at ≥{minCoverageThreshold}x)
           </span>
           <p className="text-[11px] text-gray-400">
             The following samples had insufficient coverage breadth for this strain and were excluded from comparative mutational sharing analysis to avoid false clustering on uncalled regions (NNNs):
           </p>
           <div className="flex flex-wrap gap-2 mt-1">
             {excludedSamples.map(sample => {
-              const cov = (selectedRefName && sample.coverage && sample.coverage[selectedRefName]) ? sample.coverage[selectedRefName] : (sample.coverage || {});
-              const breadth = cov.coverage_breadth_10x !== undefined ? cov.coverage_breadth_10x : 0;
+              const breadth = getBreadth(sample);
               return (
                 <span key={sample.sample_id} className="text-[11px] bg-dark-card border border-dark-border text-gray-300 font-mono px-2.5 py-1 rounded-lg">
                   {sample.sample_id}: <strong className="text-brand-rose">{breadth.toFixed(1)}% cov</strong>

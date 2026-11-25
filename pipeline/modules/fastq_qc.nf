@@ -16,38 +16,38 @@ process FASTQ_QC {
         // Paired-end Illumina QC
         """
         # Trim adapters with BBDuk
-        bbduk.sh \\
-            in1=${reads[0]} in2=${reads[1]} \\
-            out1=adapter_trimmed_R1.fastq.gz out2=adapter_trimmed_R2.fastq.gz \\
-            ref=adapters ktrim=r k=23 mink=11 hdist=1 tpe tbo \\
+        bbduk.sh \
+            in1=${reads[0]} in2=${reads[1]} \
+            out1=adapter_trimmed_R1.fastq.gz out2=adapter_trimmed_R2.fastq.gz \
+            ref=adapters ktrim=r k=23 mink=11 hdist=1 tpe tbo qin=33 \
             threads=${task.cpus}
 
         # Quality trim with fastp
-        fastp \\
-            -i adapter_trimmed_R1.fastq.gz -I adapter_trimmed_R2.fastq.gz \\
-            -o ${sample_id}_trimmed_R1.fastq.gz -O ${sample_id}_trimmed_R2.fastq.gz \\
-            -j ${sample_id}_fastp.json -h ${sample_id}_fastp.html \\
-            --thread ${task.cpus} \\
-            -q ${min_qual} \\
+        fastp \
+            -i adapter_trimmed_R1.fastq.gz -I adapter_trimmed_R2.fastq.gz \
+            -o ${sample_id}_trimmed_R1.fastq.gz -O ${sample_id}_trimmed_R2.fastq.gz \
+            -j ${sample_id}_fastp.json -h ${sample_id}_fastp.html \
+            --thread ${task.cpus} \
+            -q ${min_qual} \
             --disable_adapter_trimming
         """
     } else {
         // Single-end ONT QC
         """
         # Trim adapters with BBDuk
-        bbduk.sh \\
-            in=${reads} \\
-            out=adapter_trimmed.fastq.gz \\
-            literal=AACGCTTTCGCGTTTTTCGTGCGCCGCTTCA ktrim=l k=18 mink=11 hdist=1 \\
+        bbduk.sh \
+            in=${reads} \
+            out=adapter_trimmed.fastq.gz \
+            literal=${params.ont_adapter} ktrim=l k=18 mink=11 hdist=1 qin=33 \
             threads=${task.cpus}
 
         # Quality trim with fastp
-        fastp \\
-            -i adapter_trimmed.fastq.gz \\
-            -o ${sample_id}_trimmed.fastq.gz \\
-            -j ${sample_id}_fastp.json -h ${sample_id}_fastp.html \\
-            --thread ${task.cpus} \\
-            -q ${min_qual} \\
+        fastp \
+            -i adapter_trimmed.fastq.gz \
+            -o ${sample_id}_trimmed.fastq.gz \
+            -j ${sample_id}_fastp.json -h ${sample_id}_fastp.html \
+            --thread ${task.cpus} \
+            -q ${min_qual} \
             --disable_adapter_trimming
         """
     }

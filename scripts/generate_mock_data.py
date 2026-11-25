@@ -118,12 +118,16 @@ def main():
                 "mean_depth": 352.4,
                 "coverage_breadth_10x": 99.80,
                 "coverage_breadth_30x": 99.20,
+                "coverage_breadth_min_cov": 99.80,
+                "mapped_reads": 105700,
                 "coverage_profile": s1_cov_a
             },
             "RSV-B_strain_Melbourne_2026": {
                 "mean_depth": 0.8,
                 "coverage_breadth_10x": 0.00,
                 "coverage_breadth_30x": 0.00,
+                "coverage_breadth_min_cov": 0.00,
+                "mapped_reads": 240,
                 "coverage_profile": s1_cov_b
             }
         },
@@ -172,12 +176,16 @@ def main():
                 "mean_depth": 0.6,
                 "coverage_breadth_10x": 0.00,
                 "coverage_breadth_30x": 0.00,
+                "coverage_breadth_min_cov": 0.00,
+                "mapped_reads": 180,
                 "coverage_profile": s2_cov_a
             },
             "RSV-B_strain_Melbourne_2026": {
                 "mean_depth": 281.2,
                 "coverage_breadth_10x": 99.50,
                 "coverage_breadth_30x": 98.40,
+                "coverage_breadth_min_cov": 99.50,
+                "mapped_reads": 84300,
                 "coverage_profile": s2_cov_b
             }
         },
@@ -226,12 +234,16 @@ def main():
                 "mean_depth": 212.4,
                 "coverage_breadth_10x": 98.40,
                 "coverage_breadth_30x": 97.20,
+                "coverage_breadth_min_cov": 98.40,
+                "mapped_reads": 63700,
                 "coverage_profile": s3_cov_a
             },
             "RSV-B_strain_Melbourne_2026": {
                 "mean_depth": 164.2,
                 "coverage_breadth_10x": 96.10,
                 "coverage_breadth_30x": 94.80,
+                "coverage_breadth_min_cov": 96.10,
+                "mapped_reads": 49200,
                 "coverage_profile": s3_cov_b
             }
         },
@@ -275,12 +287,16 @@ def main():
                 "mean_depth": 4.1,
                 "coverage_breadth_10x": 8.40,
                 "coverage_breadth_30x": 1.10,
+                "coverage_breadth_min_cov": 8.40,
+                "mapped_reads": 1200,
                 "coverage_profile": s4_cov_a
             },
             "RSV-B_strain_Melbourne_2026": {
                 "mean_depth": 1.4,
                 "coverage_breadth_10x": 2.10,
                 "coverage_breadth_30x": 0.00,
+                "coverage_breadth_min_cov": 2.10,
+                "mapped_reads": 420,
                 "coverage_profile": s4_cov_b
             }
         },
@@ -301,11 +317,58 @@ def main():
         }
     })
     
+    # Calculate mock distance matrices dynamically based on consensus sequences
+    distance_matrices = {}
+    distance_matrices_by_name = {}
+    sample_ids = [s["sample_id"] for s in samples]
+    num_samples = len(samples)
+    
+    for ref in references:
+        ref_name = ref["name"]
+        ref_len = ref["length"]
+        ref_seq = ref["sequence"]
+        
+        matrix = [[0.0] * num_samples for _ in range(num_samples)]
+        
+        for i in range(num_samples):
+            sA = samples[i]
+            seqA = sA["consensus"][ref_name]["sequence"]
+            
+            for j in range(i + 1, num_samples):
+                sB = samples[j]
+                seqB = sB["consensus"][ref_name]["sequence"]
+                
+                diffs = 0
+                compared = 0
+                for pos_idx in range(ref_len):
+                    charA = seqA[pos_idx]
+                    charB = seqB[pos_idx]
+                    if charA != 'N' and charB != 'N':
+                        compared += 1
+                        if charA.upper() != charB.upper():
+                            diffs += 1
+                dist = diffs / compared if compared > 0 else 0.05
+                matrix[i][j] = dist
+                matrix[j][i] = dist
+                
+        distance_matrices[ref_name] = matrix
+        
+        ref_by_name = {}
+        for i, sA_id in enumerate(sample_ids):
+            ref_by_name[sA_id] = {}
+            for j, sB_id in enumerate(sample_ids):
+                ref_by_name[sA_id][sB_id] = matrix[i][j]
+        distance_matrices_by_name[ref_name] = ref_by_name
+        
     # 4. Save report
     report = {
         "run_id": "RSV_RUN_2026-05-30",
+        "min_coverage_threshold": 10,
         "references": references,
         "genes": genes,
+        "distance_matrices": distance_matrices,
+        "distance_matrix_order": sample_ids,
+        "distance_matrices_by_name": distance_matrices_by_name,
         "samples": samples
     }
     

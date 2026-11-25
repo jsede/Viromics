@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Filter, Download, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function VariantTable({ variants, sampleId }) {
@@ -12,6 +12,10 @@ export default function VariantTable({ variants, sampleId }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [sampleId, searchTerm, geneFilter, typeFilter]);
+
   if (!variants || variants.length === 0) {
     return (
       <div className="p-8 text-center text-gray-400 glass-panel rounded-2xl">
@@ -21,7 +25,7 @@ export default function VariantTable({ variants, sampleId }) {
   }
 
   // Get list of unique genes for filtering dropdown
-  const uniqueGenes = ['ALL', ...new Set(variants.map(v => v.gene))];
+  const uniqueGenes = ['ALL', ...new Set(variants.map(v => v.gene).filter(Boolean))];
 
   // Sorting handler
   const handleSort = (field) => {
@@ -35,9 +39,14 @@ export default function VariantTable({ variants, sampleId }) {
 
   // Filter & Search Logic
   const filteredVariants = variants.filter(v => {
+    const geneStr = v.gene || '';
+    const aaStr = v.aa_change || '';
+    const statusStr = v.status || '';
     const matchesSearch = 
       v.position.toString().includes(searchTerm) ||
-      v.gene.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      geneStr.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      aaStr.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      statusStr.toLowerCase().includes(searchTerm.toLowerCase()) ||
       `${v.ref}>${v.alt}`.toLowerCase().includes(searchTerm.toLowerCase());
       
     const matchesGene = geneFilter === 'ALL' || v.gene === geneFilter;
@@ -69,7 +78,7 @@ export default function VariantTable({ variants, sampleId }) {
 
   // CSV Export utility
   const exportToCSV = () => {
-    const headers = ["Position", "Ref", "Alt", "Gene", "Type", "Depth", "Frequency", "Quality"];
+    const headers = ["Position", "Ref", "Alt", "Gene", "Type", "Depth", "Frequency", "Quality", "AA Change", "Status"];
     const csvRows = [headers.join(",")];
     
     sortedVariants.forEach(v => {
@@ -77,11 +86,13 @@ export default function VariantTable({ variants, sampleId }) {
         v.position,
         v.ref,
         v.alt,
-        `"${v.gene}"`,
+        `"${v.gene || ''}"`,
         v.type,
         v.depth,
         v.frequency,
-        v.quality
+        v.quality,
+        `"${v.aa_change || ''}"`,
+        `"${v.status || ''}"`
       ].join(","));
     });
     
@@ -174,7 +185,7 @@ export default function VariantTable({ variants, sampleId }) {
                   Position <ArrowUpDown className="w-3 h-3" />
                 </div>
               </th>
-              <th className="p-4">Ref &gt; Alt</th>
+              <th className="p-4">SNP</th>
               <th 
                 className="p-4 cursor-pointer hover:text-white transition-colors"
                 onClick={() => handleSort('gene')}
@@ -227,15 +238,29 @@ export default function VariantTable({ variants, sampleId }) {
                         <span className="text-brand-indigo font-bold mx-1.5">&gt;</span>
                         <span className="text-brand-rose font-bold">{v.alt}</span>
                       </div>
-                      {v.aa_change && (
-                        <span className={`text-[10px] mt-0.5 font-bold ${
-                          v.aa_change.includes('(syn)') 
-                            ? 'text-gray-500 font-normal' 
-                            : 'text-brand-teal'
-                        }`}>
-                          {v.aa_change.includes('(syn)') ? `${v.aa_change.replace(' (syn)', '')} (syn)` : `p.${v.aa_change}`}
+                      {v.aa_change ? (
+                        v.aa_change === 'AA annotation unavailable' ? (
+                          <span className="text-[10px] mt-0.5 text-gray-500 font-normal italic">
+                            AA unavailable{v.status ? ` (${v.status})` : ''}
+                          </span>
+                        ) : v.aa_change === 'Indel' ? (
+                          <span className="text-[10px] mt-0.5 text-brand-amber font-normal">
+                            Indel
+                          </span>
+                        ) : v.aa_change.includes('(syn)') ? (
+                          <span className="text-[10px] mt-0.5 text-gray-500 font-normal">
+                            {v.aa_change.replace(' (syn)', '')} (syn)
+                          </span>
+                        ) : (
+                          <span className="text-[10px] mt-0.5 font-bold text-brand-teal">
+                            {v.aa_change.split('/').map(a => a.startsWith('p.') ? a : `p.${a}`).join('/')}
+                          </span>
+                        )
+                      ) : v.status ? (
+                        <span className="text-[10px] mt-0.5 text-gray-500 font-normal italic">
+                          {v.status}
                         </span>
-                      )}
+                      ) : null}
                     </div>
                   </td>
                   <td className="p-4">

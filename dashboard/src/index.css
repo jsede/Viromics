@@ -308,3 +308,64 @@ header span.text-gray-400 {
 header strong.text-white {
   color: #FFFFFF !important;            /* Crisp white for the run ID value */
 }
+
+/* High-contrast tooltip overrides to bypass the light-theme overrides */
+.glass-panel .status-tooltip,
+.glass-panel .status-tooltip div,
+.glass-panel .status-tooltip span,
+.glass-panel .status-tooltip p,
+.glass-panel .status-tooltip strong,
+.glass-panel .chart-tooltip,
+.glass-panel .chart-tooltip div,
+.glass-panel .chart-tooltip span,
+.glass-panel .chart-tooltip p,
+.glass-panel .chart-tooltip strong {
+  color: #F1F5F9 !important; /* text-slate-200 */
+}
+.glass-panel .status-tooltip .text-white,
+.glass-panel .status-tooltip div.text-white,
+.glass-panel .status-tooltip strong.text-white,
+.glass-panel .chart-tooltip .text-white,
+.glass-panel .chart-tooltip div.text-white,
+.glass-panel .chart-tooltip span.text-white,
+.glass-panel .chart-tooltip strong.text-white {
+  color: #FFFFFF !important;
+}
+.glass-panel .status-tooltip .text-slate-300,
+.glass-panel .status-tooltip p.text-slate-300,
+.glass-panel .chart-tooltip .text-slate-300,
+.glass-panel .chart-tooltip p.text-slate-300 {
+  color: #CBD5E1 !important; /* text-slate-300 */
+}
+.glass-panel .status-tooltip .text-slate-400,
+.glass-panel .status-tooltip span.text-slate-400,
+.glass-panel .chart-tooltip .text-slate-400,
+.glass-panel .chart-tooltip span.text-slate-400 {
+  color: #94A3B8 !important; /* text-slate-400 */
+}
+.glass-panel .chart-tooltip .text-brand-emerald,
+.glass-panel .chart-tooltip span.text-brand-emerald {
+  color: #10B981 !important; /* Keep original bright emerald green on dark background! */
+}
+.glass-panel .chart-tooltip .text-brand-amber,
+.glass-panel .chart-tooltip span.text-brand-amber {
+  color: #F59E0B !important; /* Keep original bright amber yellow on dark background! */
+}
+.glass-panel .chart-tooltip .text-brand-rose,
+.glass-panel .chart-tooltip span.text-brand-rose {
+  color: #EF4444 !important; /* Keep original bright rose red on dark background! */
+}
+
+
+/* High-contrast dynamic metric color classes for Consensus Summary & QC table and QA widgets */
+.glass-panel .text-brand-emerald {
+  color: #059669 !important; /* Richer, higher-contrast emerald green for light-mode readability */
+}
+.glass-panel .text-brand-amber {
+  color: #D97706 !important; /* Richer, higher-contrast amber/orange for light-mode readability */
+}
+.glass-panel .text-brand-rose {
+  color: #DC2626 !important; /* Richer, higher-contrast rose/red for light-mode readability */
+}
+
+

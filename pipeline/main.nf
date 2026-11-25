@@ -41,7 +41,7 @@ def helpMessage() {
 */
 
 include { FASTQ_QC } from './modules/fastq_qc.nf'
-include { ALIGN_READS } from './modules/align_reads.nf'
+include { INDEX_REFERENCE; ALIGN_READS } from './modules/align_reads.nf'
 include { PRIMER_TRIM } from './modules/primer_trim.nf'
 include { VARIANT_CALL } from './modules/variant_call.nf'
 include { CONSENSUS_GEN } from './modules/consensus_gen.nf'
@@ -76,7 +76,9 @@ workflow {
         min_consensus_depth = min_coverage
     }
 
-    def min_qual = params.min_qual ?: 20
+    def map_qual = params.min_qual ?: 20
+    def base_qual = (params.platform == 'ont') ? (params.min_qual == 20 ? 15 : params.min_qual) : (params.min_qual ?: 20)
+    def min_variant_qual = params.min_variant_qual ?: 20
 
     log.info "Starting Viromics Pipeline..."
     log.info "Platform            : ${params.platform}"
@@ -90,6 +92,9 @@ workflow {
     log.info "Min Coverage (DP)   : ${min_coverage}"
     log.info "Min Allele Freq (AF): ${min_freq}"
     log.info "Min Consensus Depth : ${min_consensus_depth}"
+    log.info "Min Mapping Qual    : ${map_qual}"
+    log.info "Min Base Qual       : ${base_qual}"
+    log.info "Min Variant Qual    : ${min_variant_qual}"
     log.info "Use IUPAC           : ${params.use_iupac}"
     log.info "OutDir              : ${params.outdir}"
     
@@ -139,11 +144,17 @@ workflow {
     metadata_ch = params.metadata ? file(params.metadata, checkIfExists: true) : []
     
     // Core Workflow Execution
-    FASTQ_QC(reads_ch, min_qual)
-    ALIGN_READS(FASTQ_QC.out.trimmed_reads, ref_ch)
+    FASTQ_QC(reads_ch, base_qual)
+    if (params.platform == 'illumina') {
+        INDEX_REFERENCE(ref_ch)
+        bwa_index_ch = INDEX_REFERENCE.out.index.map { it[1] }
+    } else {
+        bwa_index_ch = Channel.value([])
+    }
+    ALIGN_READS(FASTQ_QC.out.trimmed_reads, ref_ch, bwa_index_ch)
     PRIMER_TRIM(ALIGN_READS.out.bam, primer_bed_ch)
     
-    VARIANT_CALL(PRIMER_TRIM.out.trimmed_bam, ref_ch, min_coverage, min_qual)
+    VARIANT_CALL(PRIMER_TRIM.out.trimmed_bam, ref_ch, min_coverage, min_freq, map_qual, base_qual, min_variant_qual)
     
     // Join the BAMs and VCFs channels on sample_id key to ensure they match
     consensus_input_ch = PRIMER_TRIM.out.trimmed_bam.join(VARIANT_CALL.out.vcf)

@@ -200,10 +200,20 @@ export default function GeneMap({ genes, variants, refLength }) {
                 {hoveredVariant.aa_change && (
                   <span className="text-gray-400 col-span-2">
                     Protein Change:{' '}
-                    <strong className={hoveredVariant.aa_change.includes('(syn)') ? 'text-gray-400 font-medium' : 'text-brand-indigo font-bold'}>
+                    <strong className={
+                      hoveredVariant.aa_change.includes('(syn)') || hoveredVariant.aa_change === 'AA annotation unavailable'
+                        ? 'text-gray-400 font-medium'
+                        : hoveredVariant.aa_change === 'Indel'
+                        ? 'text-brand-amber font-medium'
+                        : 'text-brand-indigo font-bold'
+                    }>
                       {hoveredVariant.aa_change.includes('(syn)') 
                         ? `${hoveredVariant.aa_change.replace(' (syn)', '')} (Synonymous)` 
-                        : `p.${hoveredVariant.aa_change} (Non-synonymous)`}
+                        : hoveredVariant.aa_change === 'AA annotation unavailable'
+                        ? `AA unavailable${hoveredVariant.status ? ` (${hoveredVariant.status})` : ''}`
+                        : hoveredVariant.aa_change === 'Indel'
+                        ? 'Indel'
+                        : `${hoveredVariant.aa_change.split('/').map(a => a.startsWith('p.') ? a : `p.${a}`).join('/')} (Non-synonymous)`}
                     </strong>
                   </span>
                 )}

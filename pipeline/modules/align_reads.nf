@@ -1,3 +1,18 @@
+process INDEX_REFERENCE {
+    tag "$reference"
+
+    input:
+    path reference
+
+    output:
+    tuple path(reference), path("${reference}.*"), emit: index
+
+    script:
+    """
+    bwa index ${reference}
+    """
+}
+
 process ALIGN_READS {
     tag "$sample_id"
     publishDir { "${params.outdir}/${sample_id}/alignment" }, mode: 'copy'
@@ -5,6 +20,7 @@ process ALIGN_READS {
     input:
     tuple val(sample_id), path(reads)
     path reference
+    path bwa_index
 
     output:
     tuple val(sample_id), path("${sample_id}_raw.bam"), emit: bam
@@ -12,10 +28,7 @@ process ALIGN_READS {
     script:
     if (params.platform == 'illumina') {
         """
-        # Index reference
-        bwa index ${reference}
-        
-        # Align paired-end reads
+        # Align paired-end reads (pre-computed index staged)
         bwa mem -t ${task.cpus} ${reference} ${reads[0]} ${reads[1]} | \\
             samtools view -@ ${task.cpus} -bS - | \\
             samtools sort -@ ${task.cpus} -o ${sample_id}_raw.bam -
