@@ -10,10 +10,10 @@ An integrated suite for genomic epidemiology of viral pathogens. It combines a m
 ## Key Features
 
 ### Nextflow DSL2 Analytical Pipeline
-- **Platform-Specific Optimization**: Dynamic parameter configuration supporting both short-read Illumina and long-read Oxford Nanopore Technology (ONT) datasets.
-- **Primer & Amplicon Analysis**: Automatic primer-clipping via `samtools ampliconclip` and coverage metrics calculation across amplicons using primer BED schemes.
-- **Variant Calling**: Strict allele-frequency filtering and strand-aware codon translation to annotate synonymous and non-synonymous mutations.
-- **Resilient Consensus Assembly**: IUPAC ambiguity support (`-I`) and zero-coverage consensus masking (`samtools depth -aa`) to prevent draft assemblies from retaining unmapped reference bases.
+- **Platform-Specific Optimization**: Dedicated QC (`fastp` for paired-end Illumina with `--detect_adapter_for_pe --cut_tail --trim_poly_g`; `fastplong` mean-Phred & length filtering for ONT), alignment filtering (`-F 0x904 -q`), and dynamic platform defaults.
+- **Primer & Amplicon Analysis**: Strand-aware, tolerance-adjusted primer clipping (`samtools ampliconclip --both-ends --strand --soft-clip --tolerance`) with paired-end mate fixing (`samtools fixmate`) and amplicon coverage metrics.
+- **Variant Calling**: Hardened `bcftools` (`-B` no-BAQ, `-X ont-sup` / `-X illumina`, `bcftools norm -m -any`, deterministic strand-balanced downsampling on ultra-deep amplicons), filtering on `QUAL`, high-quality `FORMAT/DP`, and per-allele `FORMAT/AD`, with strand-aware codon translation.
+- **Resilient Consensus Assembly**: Strict decoupling of reported subclonal variants (`AF >= min_freq`) from consensus assembly (`AF >= min_consensus_freq`, default `0.50`), optional biallelic SNP IUPAC ambiguity coding (`--use_iupac`), and deletion-safe low-coverage masking (`samtools depth -aa -J -Q -q -G 0xF04`) synced with variant calling.
 - **Epidemiological Distance Engine**: Whole-genome, pairwise genetic distance calculation. Computes SNP-only divergence across coordinates covered $\ge 10\text{x}$ in both compared samples, rendering the distance matrix frame-shift-proof and indel-resilient.
 
 ### React Web Dashboard
@@ -83,10 +83,23 @@ nextflow run pipeline/main.nf \
 | `--primer_bed` | `null` | Path to primer scheme BED file for amplicon clipping and stats |
 | `--amplicons_bed` | `null` | Explicit amplicon coordinates BED file (inferred from primer BED if null) |
 | `--metadata` | `null` | Path to sample metadata CSV file |
-| `--min_coverage` | `10` (Illumina) / `50` (ONT) | Minimum depth threshold for variant calling |
+| `--min_coverage` | `10` (Illumina) / `50` (ONT) | Minimum HQ depth (`FORMAT/DP`) for variant calling |
 | `--min_freq` | `0.2` (Illumina) / `0.5` (ONT) | Minimum alternative allele frequency to report variants |
-| `--min_consensus_depth` | Falls back to `--min_coverage` | Minimum depth to call consensus bases; lower depth is masked as `N` |
-| `--use_iupac` | `false` | Enable IUPAC ambiguity codes for mixed variant sites in consensus |
+| `--min_consensus_depth` | Falls back to `--min_coverage` | Minimum HQ depth to call consensus bases; lower depth is masked as `N` |
+| `--min_consensus_freq` | `0.50` | Minimum allele frequency for haploid consensus & major indels |
+| `--min_map_qual` | `20` | Minimum MAPQ for alignment, depth, and variant calling |
+| `--min_base_qual` | `20` (Illumina) / `15` (ONT) | Minimum base quality for depth masking and variant calling |
+| `--min_variant_qual` | `20` | Minimum VCF `QUAL` threshold |
+| `--primer_tolerance` | `5` (Illumina) / `15` (ONT) | `samtools ampliconclip --tolerance` in bp |
+| `--min_clipped_len` | `30` (Illumina) / `50` (ONT) | Minimum clipped read length retained |
+| `--ont_min_mean_qual` | `10` | Minimum mean read Phred quality for ONT `fastplong` QC |
+| `--ont_min_length` / `--ont_max_length` | `100` / `0` (unlimited) | ONT read length bounds for `fastplong` QC |
+| `--ont_adapter_fasta` | `null` | Optional custom ONT adapter FASTA (auto-detected if null) |
+| `--disable_baq` | `true` | Pass `-B` (`--no-BAQ`) to `bcftools mpileup` |
+| `--max_mpileup_depth` | `100000` | Max pileup depth; triggers deterministic strand-balanced downsampling if exceeded |
+| `--downsample_seed` | `42` | Fixed RNG seed for deterministic strand-balanced downsampling |
+| `--use_iupac` | `false` | Enable IUPAC ambiguity codes for mixed biallelic SNPs in consensus |
+| `--min_iupac_freq` / `--max_iupac_freq` | `0.25` / `0.75` | Allele frequency band for IUPAC biallelic SNP coding |
 | `--outdir` | `./results` | Target directory to write execution results |
 | `-profile` | `standard` | Environment configuration profile (e.g., `-profile conda`) |
 

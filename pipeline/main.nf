@@ -26,10 +26,25 @@ def helpMessage() {
       --primer_bed          Path to primer scheme BED file for amplicon trimming
       --amplicons_bed       Path to explicit amplicon coordinates BED file
       --metadata            Path to sample metadata CSV file
-      --min_coverage        Minimum depth for variant calling (default: 10 for Illumina, 50 for ONT)
-      --min_freq            Minimum alt allele frequency for variants (default: 0.2 for Illumina, 0.5 for ONT)
-      --min_consensus_depth Minimum depth to call consensus base (falls back to min_coverage)
-      --use_iupac           Output IUPAC ambiguity codes for mixed sites in consensus (default: false)
+      --min_coverage        Minimum HQ depth for variant calling (default: 10 for Illumina, 50 for ONT)
+      --min_freq            Minimum alt allele frequency to report variants (default: 0.2 for Illumina, 0.5 for ONT)
+      --min_consensus_depth Minimum HQ depth to call consensus base (falls back to min_coverage)
+      --min_consensus_freq  Minimum alt allele frequency for haploid consensus & major indels (default: 0.50)
+      --min_map_qual        Minimum mapping quality (MAPQ) for alignment/depth/variants (default: 20)
+      --min_base_qual       Minimum base quality for depth/variants (default: 20 for Illumina, 15 for ONT)
+      --min_variant_qual    Minimum VCF QUAL score for variant calling (default: 20)
+      --primer_tolerance    samtools ampliconclip tolerance in bp (default: 5 for Illumina, 15 for ONT)
+      --min_clipped_len     Minimum read length retained after QC/clipping (default: 30 Illumina, 50 ONT)
+      --ont_min_mean_qual   Minimum mean read Phred quality for ONT fastplong QC (default: 10)
+      --ont_min_length      Minimum ONT read length for fastplong QC (default: 100)
+      --ont_max_length      Maximum ONT read length for fastplong QC, 0 = unlimited (default: 0)
+      --ont_adapter_fasta   Optional FASTA file of custom ONT adapter sequences (default: auto-detect)
+      --disable_baq         Pass -B (--no-BAQ) to bcftools mpileup (default: true)
+      --max_mpileup_depth   Max pileup depth cap; deeper contigs undergo deterministic strand-balanced downsampling (default: 100000)
+      --downsample_seed     Fixed RNG seed for strand-balanced downsampling (default: 42)
+      --use_iupac           Output IUPAC ambiguity codes for mixed biallelic SNPs in consensus (default: false)
+      --min_iupac_freq      Lower AF bound (inclusive) for IUPAC SNP coding (default: 0.25)
+      --max_iupac_freq      Upper AF bound (exclusive) for IUPAC SNP coding (default: 0.75)
       --outdir              Directory to write results to (default: './results')
     """
 }
@@ -60,6 +75,10 @@ workflow {
         exit 0
     }
 
+    if (!(params.platform in ['illumina', 'ont'])) {
+        error "Invalid --platform '${params.platform}'. Supported values are 'illumina' or 'ont'."
+    }
+
     // Set platform-specific default parameters dynamically
     def min_coverage = params.min_coverage
     if (min_coverage == null || min_coverage == 'null' || min_coverage == '') {
@@ -76,9 +95,35 @@ workflow {
         min_consensus_depth = min_coverage
     }
 
-    def map_qual = params.min_qual ?: 20
-    def base_qual = (params.platform == 'ont') ? (params.min_qual == 20 ? 15 : params.min_qual) : (params.min_qual ?: 20)
-    def min_variant_qual = params.min_variant_qual ?: 20
+    def min_map_qual = (params.min_map_qual != null) ? params.min_map_qual : 20
+    def min_base_qual = params.min_base_qual
+    if (min_base_qual == null || min_base_qual == 'null' || min_base_qual == '') {
+        min_base_qual = (params.min_qual != null && params.min_qual != 'null' && params.min_qual != '')
+            ? params.min_qual
+            : ((params.platform == 'ont') ? 15 : 20)
+    }
+
+    def primer_tolerance = params.primer_tolerance
+    if (primer_tolerance == null || primer_tolerance == 'null' || primer_tolerance == '') {
+        primer_tolerance = (params.platform == 'ont') ? 15 : 5
+    }
+
+    def min_clipped_len = params.min_clipped_len
+    if (min_clipped_len == null || min_clipped_len == 'null' || min_clipped_len == '') {
+        min_clipped_len = (params.platform == 'ont') ? 50 : 30
+    }
+
+    def min_variant_qual = (params.min_variant_qual != null) ? params.min_variant_qual : 20
+    def min_consensus_freq = (params.min_consensus_freq != null) ? params.min_consensus_freq : 0.50
+    def min_iupac_freq = (params.min_iupac_freq != null) ? params.min_iupac_freq : 0.25
+    def max_iupac_freq = (params.max_iupac_freq != null) ? params.max_iupac_freq : 0.75
+    def disable_baq = (params.disable_baq != null) ? params.disable_baq : true
+    def max_mpileup_depth = (params.max_mpileup_depth != null) ? params.max_mpileup_depth : 100000
+    def downsample_seed = (params.downsample_seed != null) ? params.downsample_seed : 42
+
+    if (min_iupac_freq < 0 || min_iupac_freq >= max_iupac_freq || max_iupac_freq > 1) {
+        error "Invalid IUPAC frequency bounds: require 0 <= min_iupac_freq (${min_iupac_freq}) < max_iupac_freq (${max_iupac_freq}) <= 1."
+    }
 
     log.info "Starting Viromics Pipeline..."
     log.info "Platform            : ${params.platform}"
@@ -92,10 +137,17 @@ workflow {
     log.info "Min Coverage (DP)   : ${min_coverage}"
     log.info "Min Allele Freq (AF): ${min_freq}"
     log.info "Min Consensus Depth : ${min_consensus_depth}"
-    log.info "Min Mapping Qual    : ${map_qual}"
-    log.info "Min Base Qual       : ${base_qual}"
+    log.info "Min Consensus Freq  : ${min_consensus_freq}"
+    log.info "Min Mapping Qual    : ${min_map_qual}"
+    log.info "Min Base Qual       : ${min_base_qual}"
     log.info "Min Variant Qual    : ${min_variant_qual}"
-    log.info "Use IUPAC           : ${params.use_iupac}"
+    log.info "Primer Tolerance    : ${primer_tolerance} bp (min len: ${min_clipped_len} bp)"
+    log.info "Disable BAQ (-B)    : ${disable_baq}"
+    log.info "Max Mpileup Depth   : ${max_mpileup_depth} (seed: ${downsample_seed})"
+    log.info "Use IUPAC           : ${params.use_iupac} (band: [${min_iupac_freq}, ${max_iupac_freq}))"
+    if (params.platform == 'ont') {
+        log.info "ONT Mean Qual / Len : >= Q${params.ont_min_mean_qual}, len >= ${params.ont_min_length} (max: ${params.ont_max_length ?: 'unlimited'})"
+    }
     log.info "OutDir              : ${params.outdir}"
     
     // Define input channels
@@ -142,24 +194,51 @@ workflow {
     primer_bed_ch = params.primer_bed ? file(params.primer_bed, checkIfExists: true) : []
     amplicons_bed_ch = params.amplicons_bed ? file(params.amplicons_bed, checkIfExists: true) : []
     metadata_ch = params.metadata ? file(params.metadata, checkIfExists: true) : []
+    ont_adapter_fasta_ch = params.ont_adapter_fasta ? file(params.ont_adapter_fasta, checkIfExists: true) : []
     
     // Core Workflow Execution
-    FASTQ_QC(reads_ch, base_qual)
+    FASTQ_QC(
+        reads_ch,
+        params.platform,
+        min_base_qual,
+        min_clipped_len,
+        params.ont_min_mean_qual,
+        params.ont_min_length,
+        params.ont_max_length,
+        params.ont_adapter ?: '',
+        ont_adapter_fasta_ch
+    )
     if (params.platform == 'illumina') {
         INDEX_REFERENCE(ref_ch)
         bwa_index_ch = INDEX_REFERENCE.out.index.map { it[1] }
     } else {
         bwa_index_ch = Channel.value([])
     }
-    ALIGN_READS(FASTQ_QC.out.trimmed_reads, ref_ch, bwa_index_ch)
-    PRIMER_TRIM(ALIGN_READS.out.bam, primer_bed_ch)
+    ALIGN_READS(FASTQ_QC.out.trimmed_reads, ref_ch, bwa_index_ch, min_map_qual, params.platform)
+    PRIMER_TRIM(ALIGN_READS.out.bam, primer_bed_ch, primer_tolerance, min_clipped_len, params.platform)
     
-    VARIANT_CALL(PRIMER_TRIM.out.trimmed_bam, ref_ch, min_coverage, min_freq, map_qual, base_qual, min_variant_qual)
+    VARIANT_CALL(
+        PRIMER_TRIM.out.trimmed_bam,
+        ref_ch,
+        min_coverage,
+        min_freq,
+        min_map_qual,
+        min_base_qual,
+        min_variant_qual,
+        disable_baq,
+        max_mpileup_depth,
+        downsample_seed,
+        min_consensus_freq,
+        params.use_iupac,
+        min_iupac_freq,
+        max_iupac_freq,
+        params.platform
+    )
     
-    // Join the BAMs and VCFs channels on sample_id key to ensure they match
-    consensus_input_ch = PRIMER_TRIM.out.trimmed_bam.join(VARIANT_CALL.out.vcf)
+    // Join BAMs and consensus-filtered VCFs on sample_id so subclonal alleles never leak into haploid consensus
+    consensus_input_ch = PRIMER_TRIM.out.trimmed_bam.join(VARIANT_CALL.out.consensus_vcf)
     
-    CONSENSUS_GEN(consensus_input_ch, ref_ch, min_consensus_depth)
+    CONSENSUS_GEN(consensus_input_ch, ref_ch, min_consensus_depth, min_map_qual, min_base_qual, params.use_iupac)
     
     // Aggregate all sample results
     run_id = new Date().format("yyyy-MM-dd_HH-mm-ss")

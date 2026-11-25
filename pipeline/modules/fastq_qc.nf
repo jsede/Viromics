@@ -4,7 +4,14 @@ process FASTQ_QC {
 
     input:
     tuple val(sample_id), path(reads)
-    val min_qual
+    val platform
+    val min_base_qual
+    val min_clipped_len
+    val ont_min_mean_qual
+    val ont_min_length
+    val ont_max_length
+    val ont_adapter
+    path ont_adapter_fasta
 
     output:
     tuple val(sample_id), path("${sample_id}_trimmed*.fastq.gz"), emit: trimmed_reads
@@ -12,43 +19,62 @@ process FASTQ_QC {
     path "${sample_id}_fastp.html", emit: html_report
 
     script:
-    if (params.platform == 'illumina') {
-        // Paired-end Illumina QC
+    if (platform == 'illumina') {
+        // Paired-end Illumina QC directly via fastp (preserves true raw_reads counts)
         """
-        # Trim adapters with BBDuk
-        bbduk.sh \
-            in1=${reads[0]} in2=${reads[1]} \
-            out1=adapter_trimmed_R1.fastq.gz out2=adapter_trimmed_R2.fastq.gz \
-            ref=adapters ktrim=r k=23 mink=11 hdist=1 tpe tbo qin=33 \
-            threads=${task.cpus}
-
-        # Quality trim with fastp
-        fastp \
-            -i adapter_trimmed_R1.fastq.gz -I adapter_trimmed_R2.fastq.gz \
-            -o ${sample_id}_trimmed_R1.fastq.gz -O ${sample_id}_trimmed_R2.fastq.gz \
-            -j ${sample_id}_fastp.json -h ${sample_id}_fastp.html \
-            --thread ${task.cpus} \
-            -q ${min_qual} \
-            --disable_adapter_trimming
+        fastp \\
+            -i ${reads[0]} -I ${reads[1]} \\
+            -o ${sample_id}_trimmed_R1.fastq.gz -O ${sample_id}_trimmed_R2.fastq.gz \\
+            -j ${sample_id}_fastp.json -h ${sample_id}_fastp.html \\
+            --thread ${task.cpus} \\
+            --detect_adapter_for_pe \\
+            --cut_tail \\
+            --trim_poly_g \\
+            -q ${min_base_qual} \\
+            -l ${min_clipped_len}
         """
     } else {
-        // Single-end ONT QC
-        """
-        # Trim adapters with BBDuk
-        bbduk.sh \
-            in=${reads} \
-            out=adapter_trimmed.fastq.gz \
-            literal=${params.ont_adapter} ktrim=l k=18 mink=11 hdist=1 qin=33 \
-            threads=${task.cpus}
-
-        # Quality trim with fastp
-        fastp \
-            -i adapter_trimmed.fastq.gz \
-            -o ${sample_id}_trimmed.fastq.gz \
-            -j ${sample_id}_fastp.json -h ${sample_id}_fastp.html \
-            --thread ${task.cpus} \
-            -q ${min_qual} \
-            --disable_adapter_trimming
-        """
+        // Single-end ONT QC via fastplong (mean Phred quality + length limits + adapter trimming)
+        def max_len_opt = (ont_max_length && ont_max_length > 0) ? "--length_limit ${ont_max_length}" : ""
+        if (ont_adapter_fasta) {
+            """
+            fastplong \\
+                -i ${reads} \\
+                -o ${sample_id}_trimmed.fastq.gz \\
+                -j ${sample_id}_fastp.json -h ${sample_id}_fastp.html \\
+                -w ${task.cpus} \\
+                -m ${ont_min_mean_qual} \\
+                -u 100 \\
+                -l ${ont_min_length} \\
+                ${max_len_opt} \\
+                -a ${ont_adapter_fasta}
+            """
+        } else if (ont_adapter) {
+            """
+            printf ">ont_adapter\\n%s\\n" "${ont_adapter}" > ont_adapter_tmp.fasta
+            fastplong \\
+                -i ${reads} \\
+                -o ${sample_id}_trimmed.fastq.gz \\
+                -j ${sample_id}_fastp.json -h ${sample_id}_fastp.html \\
+                -w ${task.cpus} \\
+                -m ${ont_min_mean_qual} \\
+                -u 100 \\
+                -l ${ont_min_length} \\
+                ${max_len_opt} \\
+                -a ont_adapter_tmp.fasta
+            """
+        } else {
+            """
+            fastplong \\
+                -i ${reads} \\
+                -o ${sample_id}_trimmed.fastq.gz \\
+                -j ${sample_id}_fastp.json -h ${sample_id}_fastp.html \\
+                -w ${task.cpus} \\
+                -m ${ont_min_mean_qual} \\
+                -u 100 \\
+                -l ${ont_min_length} \\
+                ${max_len_opt}
+            """
+        }
     }
 }

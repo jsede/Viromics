@@ -910,7 +910,7 @@
             <button class="copy-btn" onclick="copyCode(this)">Copy</button>
           </div>
           <pre><code># Create conda environment with all underlying bioinformatics utilities
-conda create -n viromics -c conda-forge -c bioconda   nextflow fastp bwa minimap2 samtools bcftools ivar bbmap python=3.11
+conda create -n viromics -c conda-forge -c bioconda nextflow fastp fastplong bwa minimap2 "samtools>=1.20" "bcftools>=1.20" python
 
 # Activate environment
 conda activate viromics</code></pre>
@@ -1025,19 +1025,25 @@ npm run dev
                 <td><code>--min_coverage</code></td>
                 <td>Integer</td>
                 <td><code>10</code> (Illumina)<br><code>50</code> (ONT)</td>
-                <td>Minimum sequencing depth (DP) required to call variants and calculate coverage breadth.</td>
+                <td>Minimum high-quality depth (<code>FORMAT/DP</code>) required to call variants and calculate coverage breadth.</td>
               </tr>
               <tr>
                 <td><code>--min_freq</code></td>
                 <td>Float</td>
                 <td><code>0.2</code> (Illumina)<br><code>0.5</code> (ONT)</td>
-                <td>Minimum alternative allele frequency (AF) to report variants.</td>
+                <td>Minimum alternative allele frequency (from <code>FORMAT/AD/FORMAT/DP</code>) to report variants in the VCF and dashboard.</td>
               </tr>
               <tr>
-                <td><code>--min_qual</code></td>
+                <td><code>--min_map_qual</code></td>
+                <td>Integer</td>
+                <td><code>20</code></td>
+                <td>Minimum mapping quality (MAPQ) enforced across alignment filtering, depth masking, and variant calling.</td>
+              </tr>
+              <tr>
+                <td><code>--min_base_qual</code></td>
                 <td>Integer</td>
                 <td><code>20</code> (Illumina)<br><code>15</code> (ONT)</td>
-                <td>Minimum base quality score for read filtering and alignment.</td>
+                <td>Minimum base Phred quality (BaseQ) enforced in depth masking and variant pileups.</td>
               </tr>
               <tr>
                 <td><code>--min_variant_qual</code></td>
@@ -1049,19 +1055,61 @@ npm run dev
                 <td><code>--min_consensus_depth</code></td>
                 <td>Integer</td>
                 <td><code>min_coverage</code></td>
-                <td>Threshold below which consensus FASTA positions are masked with <code>N</code>.</td>
+                <td>HQ depth threshold below which consensus FASTA positions are masked with <code>N</code>.</td>
+              </tr>
+              <tr>
+                <td><code>--min_consensus_freq</code></td>
+                <td>Float</td>
+                <td><code>0.50</code></td>
+                <td>Minimum allele frequency required for inclusion in haploid consensus (and major indels under IUPAC mode).</td>
+              </tr>
+              <tr>
+                <td><code>--primer_tolerance</code></td>
+                <td>Integer</td>
+                <td><code>5</code> (Illumina)<br><code>15</code> (ONT)</td>
+                <td><code>samtools ampliconclip --tolerance</code> window (bp) to handle terminal indels/soft-clipping.</td>
+              </tr>
+              <tr>
+                <td><code>--min_clipped_len</code></td>
+                <td>Integer</td>
+                <td><code>30</code> (Illumina)<br><code>50</code> (ONT)</td>
+                <td>Minimum read length retained after QC and primer clipping (<code>--filter-len</code>).</td>
+              </tr>
+              <tr>
+                <td><code>--ont_min_mean_qual</code></td>
+                <td>Integer</td>
+                <td><code>10</code></td>
+                <td>Minimum mean read Phred quality for ONT <code>fastplong</code> filtering (<code>--mean_qual</code>).</td>
+              </tr>
+              <tr>
+                <td><code>--ont_min_length</code> / <code>--ont_max_length</code></td>
+                <td>Integer</td>
+                <td><code>100</code> / <code>0</code></td>
+                <td>ONT read length bounds for <code>fastplong</code> (<code>0</code> = no upper length limit).</td>
+              </tr>
+              <tr>
+                <td><code>--ont_adapter_fasta</code></td>
+                <td>Path</td>
+                <td><code>null</code></td>
+                <td>Optional FASTA of custom ONT adapter sequences for <code>fastplong</code> (auto-detects if omitted).</td>
+              </tr>
+              <tr>
+                <td><code>--disable_baq</code></td>
+                <td>Boolean</td>
+                <td><code>true</code></td>
+                <td>Pass <code>-B</code> (<code>--no-BAQ</code>) to <code>bcftools mpileup</code> to preserve depth in divergent viral regions.</td>
+              </tr>
+              <tr>
+                <td><code>--max_mpileup_depth</code></td>
+                <td>Integer</td>
+                <td><code>100000</code></td>
+                <td>Pileup depth cap (<code>-d</code>/<code>-L</code>); triggers deterministic strand-balanced downsampling (<code>--downsample_seed 42</code>) when exceeded.</td>
               </tr>
               <tr>
                 <td><code>--use_iupac</code></td>
                 <td>Boolean</td>
                 <td><code>false</code></td>
-                <td>When <code>true</code>, consensus calling outputs IUPAC nucleotide ambiguity codes (e.g. <code>R, Y, S, W</code>) for mixed subclonal sites.</td>
-              </tr>
-              <tr>
-                <td><code>--ont_adapter</code></td>
-                <td>String</td>
-                <td>Oxford Kit default</td>
-                <td>Custom adapter sequence for Oxford Nanopore trimming via BBDuk.</td>
+                <td>When <code>true</code>, consensus calling outputs IUPAC ambiguity codes for biallelic SNPs within <code>[--min_iupac_freq 0.25, --max_iupac_freq 0.75)</code>.</td>
               </tr>
               <tr>
                 <td><code>--outdir</code></td>
@@ -1197,28 +1245,28 @@ NTC,2026-03-15,Sydney,Control,None</code></pre>
         <div class="card-grid">
           <div class="card">
             <div class="card-title">1. FASTQ_QC</div>
-            <p><strong>Tools:</strong> BBDuk (BBMap) + fastp<br>
-            Performs adapter trimming (standard Illumina or custom ONT kit sequences), followed by polyG/tail trimming and base quality filtering (<code>-q 20</code> Illumina / <code>-q 15</code> ONT). Emits clean FastQs and Q30 metrics.</p>
+            <p><strong>Tools:</strong> fastp (Illumina) / fastplong (ONT)<br>
+            Illumina runs <code>fastp</code> directly on raw paired reads with <code>--detect_adapter_for_pe --cut_tail --trim_poly_g</code>. ONT runs <code>fastplong</code> with mean-read quality filtering (<code>--mean_qual</code>), length bounds, and automatic or custom adapter trimming.</p>
           </div>
           <div class="card">
             <div class="card-title">2. INDEX & ALIGN</div>
             <p><strong>Tools:</strong> BWA-MEM / Minimap2 + Samtools<br>
-            References are pre-indexed once per workflow execution via <code>INDEX_REFERENCE</code>. Reads are aligned (BWA-MEM for paired-end Illumina, Minimap2 <code>-ax map-ont</code> for ONT) and sorted into BAMs.</p>
+            References are pre-indexed once via <code>INDEX_REFERENCE</code>. Reads are aligned (BWA-MEM for Illumina; Minimap2 <code>-ax map-ont --secondary=no</code> for ONT) and filtered with <code>samtools view -F 0x904 -q</code> to drop unmapped, secondary, supplementary, and low-MAPQ reads.</p>
           </div>
           <div class="card">
             <div class="card-title">3. PRIMER_TRIM</div>
-            <p><strong>Tools:</strong> Samtools ampliconclip<br>
-            Clips synthetic primer sequences at amplicon ends (<code>--both-ends -b primer_bed</code>). This prevents artificial primer sequences from masking true biological viral variants.</p>
+            <p><strong>Tools:</strong> Samtools ampliconclip (+ fixmate)<br>
+            Strand-aware primer soft-clipping at both ends (<code>--both-ends --strand --soft-clip --tolerance --filter-len --no-excluded</code>), followed by <code>samtools fixmate</code> for paired-end Illumina reads.</p>
           </div>
           <div class="card">
             <div class="card-title">4. VARIANT_CALL</div>
-            <p><strong>Tools:</strong> BCFtools mpileup & call<br>
-            Configured with <code>-d 8000 -L 8000</code> to prevent indel dropping in high-depth amplicons. Calls haploid genotypes (<code>--ploidy 1</code>) and filters by depth, allele frequency, and QUAL &ge; 20.</p>
+            <p><strong>Tools:</strong> BCFtools mpileup, call, norm &amp; filter<br>
+            Deterministic strand-balanced BAM downsampling above <code>max_mpileup_depth</code>, followed by <code>bcftools mpileup</code> (<code>-B</code> no-BAQ, <code>-X illumina</code>/<code>ont-sup</code>, <code>FORMAT/AD,FORMAT/DP</code>), diploid calling, <code>bcftools norm -m -any</code>, and decoupled reported vs. consensus VCFs.</p>
           </div>
           <div class="card">
             <div class="card-title">5. CONSENSUS_GEN</div>
             <p><strong>Tools:</strong> Samtools depth + BCFtools consensus<br>
-            Uses <code>samtools depth -aa -J</code> to detect zero-coverage and deleted sites. Masks regions below <code>min_consensus_depth</code> with <code>N</code>. Supports IUPAC ambiguity codes via <code>-H I</code>.</p>
+            Uses <code>samtools depth -aa -J -Q -q -G 0xF04</code> synced exactly with variant calling. Masks sites below <code>min_consensus_depth</code> with <code>N</code>, applies only major alleles (<code>AF &ge; min_consensus_freq</code>) in haploid mode, or biallelic SNP IUPAC codes via <code>-H I</code>.</p>
           </div>
           <div class="card">
             <div class="card-title">6. AGGREGATE_METRICS</div>
@@ -1272,12 +1320,12 @@ NTC,2026-03-15,Sydney,Control,None</code></pre>
           </table>
         </div>
 
-        <h3>Haploid Genome Biology</h3>
-        <p>Viral genomes (e.g. coronaviruses, flaviviruses, paramyxoviruses) exist as non-diploid single genomes. Viromics enforces haploid variant calling (<code>--ploidy 1</code>) to prevent pseudo-heterozygous diploid calls (such as <code>0/1</code>). Heterogeneous or subclonal intra-host viral quasispecies can be captured through the alternative allele frequency (<code>AF</code>) and optional IUPAC ambiguity codes.</p>
+        <h3>Haploid Genome Biology &amp; Subclonal Decoupling</h3>
+        <p>Viral genomes (e.g. coronaviruses, flaviviruses, paramyxoviruses) exist as haploid populations. To capture true intra-host subclonal variants (e.g. Illumina <code>AF &ge; 0.20</code>) without distorting consensus sequences, Viromics runs diploid likelihood calling followed by <code>bcftools norm -m -any</code> and strictly decouples the reported VCF from the consensus VCF: haploid consensus applies only major alleles (<code>AF &ge; --min_consensus_freq</code>, default <code>0.50</code>), while <code>--use_iupac</code> restricts IUPAC ambiguity codes to mixed biallelic SNPs within <code>[--min_iupac_freq, --max_iupac_freq)</code> and keeps indels major-allele only.</p>
 
         <h3>Deletion Protection in Depth Masking</h3>
         <p>
-          Standard depth calculations can mistake true biological deletions (e.g. spike 69-70del) for sequencing failures. Viromics executes <code>samtools depth -aa -J</code>, where <code>-J</code> incorporates reads spanning deletion junctions. This guarantees that authentic deletions are not erroneously masked as <code>N</code>.
+          Standard depth calculations can mistake true biological deletions (e.g. spike 69-70del) for sequencing failures. Viromics executes <code>samtools depth -aa -J -Q -q -G 0xF04</code> synced to the exact MAPQ and BaseQ filters of <code>VARIANT_CALL</code>, where <code>-J</code> incorporates reads spanning deletion junctions so authentic deletions are never masked as <code>N</code> while low-MAPQ cross-mappings are excluded.
         </p>
       </section>
 

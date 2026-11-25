@@ -3,32 +3,35 @@ process CONSENSUS_GEN {
     publishDir { "${params.outdir}/${sample_id}/consensus" }, mode: 'copy'
 
     input:
-    tuple val(sample_id), path(bam), path(bai), path(vcf)
+    tuple val(sample_id), path(bam), path(bai), path(consensus_vcf)
     path reference
     val min_consensus_depth
+    val min_map_qual
+    val min_base_qual
+    val use_iupac
 
     output:
     tuple val(sample_id), path("${sample_id}_consensus.fasta"), emit: consensus
 
     script:
-    def hap_arg = params.use_iupac ? "-H I" : "-H A"
+    def hap_arg = use_iupac ? "-H I" : "-H A"
     """
-    # Clean empty lines from reference FASTA to prevent bcftools consensus from skipping contigs
-    grep -v '^\$' ${reference} > clean_reference.fasta
+    # Clean CRLF and empty lines from reference FASTA to prevent bcftools consensus from skipping contigs
+    awk '{ sub(/\\r\$/, ""); if (NF > 0) print }' ${reference} > clean_reference.fasta
 
-    # Create coverage depth mask (regions below min_consensus_depth, including unmapped 0x coverage contigs)
+    # Create coverage depth mask synced with VARIANT_CALL MAPQ/BaseQ/flag filters
     # -J includes reads with deletions so genuine biological deletions are not falsely masked with N
-    samtools depth -aa -J ${bam} | \\
-        awk '\$3 < ${min_consensus_depth} {print \$1 "\\t" \$2-1 "\\t" \$2}' > low_coverage_mask.bed
+    samtools depth -aa -J -Q ${min_map_qual} -q ${min_base_qual} -G 0xF04 ${bam} | \\
+        awk -v min_dp="${min_consensus_depth}" '\$3 < min_dp {print \$1 "\\t" \$2-1 "\\t" \$2}' > low_coverage_mask.bed
         
-    # Compress and index VCF
-    bgzip -c ${vcf} > ${vcf}.gz
-    tabix -p vcf ${vcf}.gz
+    # Compress and index consensus VCF
+    bgzip -c ${consensus_vcf} > ${consensus_vcf}.gz
+    tabix -p vcf ${consensus_vcf}.gz
     
     # Generate consensus calling bcftools consensus, mask low-cov sites with N
-    bcftools consensus ${hap_arg} -f clean_reference.fasta -m low_coverage_mask.bed ${vcf}.gz > ${sample_id}_consensus.fasta
+    bcftools consensus ${hap_arg} -f clean_reference.fasta -m low_coverage_mask.bed ${consensus_vcf}.gz > ${sample_id}_consensus.fasta
     
-    # Replace header to prefix with sample ID and retain the reference name in a portable way
-    awk '/^>/ {print ">${sample_id}_" substr(\$0, 2); next} {print}' ${sample_id}_consensus.fasta > tmp_consensus.fasta && mv tmp_consensus.fasta ${sample_id}_consensus.fasta
+    # Replace header to prefix with sample ID and retain clean contig name (strip FASTA description)
+    awk '/^>/ {split(substr(\$0, 2), a, /[ \\t]+/); print ">${sample_id}_" a[1]; next} {print}' ${sample_id}_consensus.fasta > tmp_consensus.fasta && mv tmp_consensus.fasta ${sample_id}_consensus.fasta
     """
 }
