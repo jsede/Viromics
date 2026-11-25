@@ -10,6 +10,7 @@ process FASTQ_QC {
     val ont_min_mean_qual
     val ont_min_length
     val ont_max_length
+    val ont_trim_adapters
     val ont_adapter
     path ont_adapter_fasta
 
@@ -17,6 +18,7 @@ process FASTQ_QC {
     tuple val(sample_id), path("${sample_id}_trimmed*.fastq.gz"), emit: trimmed_reads
     path "${sample_id}_fastp.json", emit: json_report
     path "${sample_id}_fastp.html", emit: html_report
+    tuple val(sample_id), path("versions_fastq_qc.yml"), emit: versions
 
     script:
     if (platform == 'illumina') {
@@ -32,10 +34,12 @@ process FASTQ_QC {
             --trim_poly_g \\
             -q ${min_base_qual} \\
             -l ${min_clipped_len}
+        fastp --version 2>&1 | head -n 1 | sed 's/^fastp /fastp: /' > versions_fastq_qc.yml
         """
     } else {
-        // Single-end ONT QC via fastplong (mean Phred quality + length limits + adapter trimming)
+        // Single-end ONT QC via fastplong (mean Phred quality + length limits; -A prevents false auto-trimming of conserved amplicon ends)
         def max_len_opt = (ont_max_length && ont_max_length > 0) ? "--length_limit ${ont_max_length}" : ""
+        def adapter_disable_opt = ont_trim_adapters ? "" : "-A"
         if (ont_adapter_fasta) {
             """
             fastplong \\
@@ -48,6 +52,7 @@ process FASTQ_QC {
                 -l ${ont_min_length} \\
                 ${max_len_opt} \\
                 -a ${ont_adapter_fasta}
+            fastplong --version 2>&1 | head -n 1 | sed 's/^fastplong /fastplong: /' > versions_fastq_qc.yml
             """
         } else if (ont_adapter) {
             """
@@ -62,6 +67,7 @@ process FASTQ_QC {
                 -l ${ont_min_length} \\
                 ${max_len_opt} \\
                 -a ont_adapter_tmp.fasta
+            fastplong --version 2>&1 | head -n 1 | sed 's/^fastplong /fastplong: /' > versions_fastq_qc.yml
             """
         } else {
             """
@@ -73,7 +79,9 @@ process FASTQ_QC {
                 -m ${ont_min_mean_qual} \\
                 -u 100 \\
                 -l ${ont_min_length} \\
-                ${max_len_opt}
+                ${max_len_opt} \\
+                ${adapter_disable_opt}
+            fastplong --version 2>&1 | head -n 1 | sed 's/^fastplong /fastplong: /' > versions_fastq_qc.yml
             """
         }
     }

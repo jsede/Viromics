@@ -37,7 +37,7 @@ def parse_custom_metadata(csv_path):
     return metadata_map
 
 def parse_fasta_file(fasta_path):
-    """Simple parser to read FASTA records from file."""
+    """Simple parser to read FASTA records from file keyed by first header token."""
     records = {}
     if not os.path.exists(fasta_path):
         return records
@@ -50,13 +50,27 @@ def parse_fasta_file(fasta_path):
             if line.startswith(">"):
                 if current_header:
                     records[current_header] = "".join(current_seq)
-                current_header = line[1:]
+                current_header = line[1:].split()[0] if line[1:].strip() else ""
                 current_seq = []
             elif line:
                 current_seq.append(line)
         if current_header:
             records[current_header] = "".join(current_seq)
     return records
+
+def find_contig_sequence(records, sample_id, ref_name):
+    """Resolve consensus contig sequence using exact header matching (never substring)."""
+    if not records:
+        return None
+    exact_prefixed = f"{sample_id}_{ref_name}"
+    if exact_prefixed in records:
+        return records[exact_prefixed]
+    if ref_name in records:
+        return records[ref_name]
+    for key, seq in records.items():
+        if key.startswith(f"{sample_id}_") and key[len(sample_id) + 1:] == ref_name:
+            return seq
+    return None
 
 def main():
     parser = argparse.ArgumentParser(
@@ -162,17 +176,7 @@ def main():
                     cons_fasta = os.path.join(results_dir, sample_id, "consensus", f"{sample_id}_consensus.fasta")
                     if os.path.exists(cons_fasta):
                         records = parse_fasta_file(cons_fasta)
-                        # Find matching record in FASTA (the header matches `{sample_id}_{ref_name}`)
-                        # Since headers are stored without '>' in parse_fasta_file keys, match directly
-                        target_key = f"{sample_id}_{ref_name}"
-                        sequence = records.get(target_key)
-                        
-                        # Fallback match if naming varies slightly
-                        if not sequence:
-                            for key, seq in records.items():
-                                if ref_name in key:
-                                    sequence = seq
-                                    break
+                        sequence = find_contig_sequence(records, sample_id, ref_name)
                     else:
                         print(f"Warning: Consensus FASTA file not found for sample {sample_id} at {cons_fasta}. Falling back to JSON report sequence.")
 

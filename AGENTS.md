@@ -24,11 +24,12 @@ Viromics is an integrated genomic epidemiology platform for viral amplicon whole
 ---
 
 ## 3. Scientific Invariants & Assumptions
-- **Haploid Viral Genomes**: Enforce haploid variant calling (`--ploidy 1`) with optional IUPAC ambiguity codes (`--use_iupac`) for subclonal variation.
-- **Fail-Closed Translation**: GFF translation exceptions without an explicitly matching curated model must return `"AA annotation unavailable"` with a distinct failure status. Never guess amino acid consequences for unsupported frameshifts.
-- **Deletion Protection**: Always use `samtools depth -aa -J` so genuine biological deletions are not falsely masked with `N`.
-- **SNP Distance Calculation**: Only compare coordinates covered $\ge \text{min_coverage}$ in both samples; mask structural deletions and uncalled `N`s; assign $1.0$ (100% divergence) if zero mutually covered bases exist.
-- **Phylogenetic Tree Guard**: Exclude samples with $< 80\%$ coverage breadth from UPGMA tree reconstruction to prevent topological distortion. Divergence axis scale must reflect true pairwise distance ($2\times$ node height).
+- **Haploid Viral Genomes**: Perform diploid likelihood variant calling (`bcftools call -mv --ploidy 2` + `bcftools norm -m -any`) to retain true subclonal alleles (`AF >= --min_freq`), while strictly decoupling consensus assembly (`AF >= --min_consensus_freq`, default `0.50`) and optional biallelic SNP IUPAC ambiguity calling (`--use_iupac`).
+- **Fail-Closed Translation**: GFF3 `phase` offsets are subtracted from the coding 5' end on both `+` and `-` strands with strict partial-codon bounds checks. GFF translation exceptions without an explicitly matching curated model (including reference alias & motif verification) must return `"AA annotation unavailable"` with a distinct failure status.
+- **Deletion Protection & Filter Sync**: Always run `samtools depth -aa -J -Q <min_map_qual> -q <min_base_qual> -G 0xF04` synced identically with `VARIANT_CALL` so genuine biological deletions are not falsely masked with `N` and low-MAPQ/BaseQ reads never inflate consensus breadth.
+- **Callable-Target QC Tiers**: When `--primer_bed` or `--amplicons_bed` is supplied, evaluate QC tiers (`PASS`/`WARN`/`FAIL`, configurable via `--qc_pass_*` / `--qc_warn_*`) on the union of primer-trimmed insert intervals (`[left_end, right_start]`) and internal `N%`, while reporting both whole-contig and callable-target metrics.
+- **SNP Distance Calculation**: Only compare coordinates covered $\ge \text{min_consensus_depth}$ in both samples; mask structural deletions and uncalled `N`s; emit `null` (not `1.0`) alongside `compared_sites_matrices = 0` when zero mutually covered bases exist.
+- **Phylogenetic Tree Guard**: Exclude samples with $< 80\%$ coverage breadth from tree reconstruction to prevent topological distortion. Divergence axis scale must reflect true pairwise distance.
 
 ---
 
@@ -36,13 +37,15 @@ Viromics is an integrated genomic epidemiology platform for viral amplicon whole
 Before concluding any feature or bug fix:
 1. Run Python test suites:
    ```bash
+   python3 pipeline/bin/test_prepare_consensus_vcf.py
    python3 pipeline/bin/test_translation_phase.py
    python3 pipeline/bin/regression_test_distance.py
+   python3 pipeline/bin/test_samtools_aa.py
    python3 pipeline/bin/test_variant_qual_filter.py
-   python3 pipeline/bin/sanity_check_rsv.py
+   python3 pipeline/bin/test_parse_metrics_m2.py
    ```
 2. Build the React dashboard:
    ```bash
    npm --prefix dashboard run build
    ```
-3. Verify that `wiki.html` contains up-to-date documentation.
+3. Verify that `wiki.html` contains up-to-date documentation and `schema/viromics_run_report.schema.json` validates report outputs.

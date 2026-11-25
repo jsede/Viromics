@@ -10,11 +10,11 @@ An integrated suite for genomic epidemiology of viral pathogens. It combines a m
 ## Key Features
 
 ### Nextflow DSL2 Analytical Pipeline
-- **Platform-Specific Optimization**: Dedicated QC (`fastp` for paired-end Illumina with `--detect_adapter_for_pe --cut_tail --trim_poly_g`; `fastplong` mean-Phred & length filtering for ONT), alignment filtering (`-F 0x904 -q`), and dynamic platform defaults.
-- **Primer & Amplicon Analysis**: Strand-aware, tolerance-adjusted primer clipping (`samtools ampliconclip --both-ends --strand --soft-clip --tolerance`) with paired-end mate fixing (`samtools fixmate`) and amplicon coverage metrics.
-- **Variant Calling**: Hardened `bcftools` (`-B` no-BAQ, `-X ont-sup` / `-X illumina`, `bcftools norm -m -any`, deterministic strand-balanced downsampling on ultra-deep amplicons), filtering on `QUAL`, high-quality `FORMAT/DP`, and per-allele `FORMAT/AD`, with strand-aware codon translation.
-- **Resilient Consensus Assembly**: Strict decoupling of reported subclonal variants (`AF >= min_freq`) from consensus assembly (`AF >= min_consensus_freq`, default `0.50`), optional biallelic SNP IUPAC ambiguity coding (`--use_iupac`), and deletion-safe low-coverage masking (`samtools depth -aa -J -Q -q -G 0xF04`) synced with variant calling.
-- **Epidemiological Distance Engine**: Whole-genome, pairwise genetic distance calculation. Computes SNP-only divergence across coordinates covered $\ge 10\text{x}$ in both compared samples, rendering the distance matrix frame-shift-proof and indel-resilient.
+- **Platform-Specific Optimization**: Dedicated QC (`fastp` for paired-end Illumina with `--detect_adapter_for_pe --cut_tail --trim_poly_g`; `fastplong` mean-Phred & length filtering with `-A` by default on ONT amplicons), alignment filtering (`-F 0x904 -q`), and dynamic platform defaults.
+- **Primer & Amplicon Analysis**: Strand-aware, tolerance-adjusted primer clipping (`samtools ampliconclip --both-ends --strand --soft-clip --tolerance`) with paired-end mate fixing (`samtools fixmate`), two-pass primer pairing (ARTIC `_LEFT_1`/`-alt1`, pre-direction `_01_LEFT`, F/R), and trimmed-insert callable-target QC tiers (`PASS`/`WARN`/`FAIL`).
+- **Variant Calling & Translation**: Hardened `bcftools` (`-B` no-BAQ, configurable `--ont_mpileup_config`, `bcftools norm -m -any`, deterministic strand-balanced downsampling on ultra-deep amplicons), `FORMAT/AD` + `FORMAT/DP` filtering, GFF3 `phase`-accurate translation with staged `--cds_models` + slippery-site verification, in-frame vs. frameshift indel classification, and structured overlapping-gene consequences.
+- **Resilient Consensus Assembly**: Strict decoupling of reported subclonal variants (`AF >= min_freq`) from consensus assembly (`AF >= min_consensus_freq`, default `0.50`), optional biallelic SNP IUPAC ambiguity coding (`--use_iupac`), and deletion-safe low-coverage masking (`samtools depth -aa -J -Q -q -G 0xF04`) with reference-coordinate `low_coverage_intervals`.
+- **Epidemiological Distance & Schema Provenance**: Whole-genome SNP distance matrices (`distance_matrices`, `snp_distance_matrices`, `compared_sites_matrices`) emitting `null` for zero-overlap pairs, full `run_config` + `software_versions` provenance, and formal validation against [`schema/viromics_run_report.schema.json`](schema/viromics_run_report.schema.json).
 
 ### React Web Dashboard
 - **Zero-Database Design**: Client-side application that processes the pipeline's structured run report (`viromics_run_report.json`) entirely within the browser.
@@ -79,10 +79,12 @@ nextflow run pipeline/main.nf \
 ### Optional Parameters
 | Parameter | Default | Description |
 | :--- | :--- | :--- |
+| `--run_id` | `viromics_<sessionId>` | Deterministic run identifier for report provenance and `-resume` caching |
 | `--gff` | `null` | Path to GFF3 annotation file for coding effect translation |
-| `--primer_bed` | `null` | Path to primer scheme BED file for amplicon clipping and stats |
+| `--primer_bed` | `null` | Path to primer scheme BED file for amplicon clipping and callable-target QC |
 | `--amplicons_bed` | `null` | Explicit amplicon coordinates BED file (inferred from primer BED if null) |
 | `--metadata` | `null` | Path to sample metadata CSV file |
+| `--cds_models` | `resources/annotation_models/cds_models.json` | Curated CDS ribosomal-slippage JSON models staged explicitly to `AGGREGATE_METRICS` |
 | `--min_coverage` | `10` (Illumina) / `50` (ONT) | Minimum HQ depth (`FORMAT/DP`) for variant calling |
 | `--min_freq` | `0.2` (Illumina) / `0.5` (ONT) | Minimum alternative allele frequency to report variants |
 | `--min_consensus_depth` | Falls back to `--min_coverage` | Minimum HQ depth to call consensus bases; lower depth is masked as `N` |
@@ -92,14 +94,18 @@ nextflow run pipeline/main.nf \
 | `--min_variant_qual` | `20` | Minimum VCF `QUAL` threshold |
 | `--primer_tolerance` | `5` (Illumina) / `15` (ONT) | `samtools ampliconclip --tolerance` in bp |
 | `--min_clipped_len` | `30` (Illumina) / `50` (ONT) | Minimum clipped read length retained |
+| `--ont_mpileup_config` | `'ont-sup'` | `bcftools mpileup -X` profile for ONT (`'ont-sup'`, `'ont'`, or `'none'`) |
+| `--ont_trim_adapters` | `false` | Enable `fastplong` de novo adapter auto-detection (disabled via `-A` by default to protect amplicon ends) |
 | `--ont_min_mean_qual` | `10` | Minimum mean read Phred quality for ONT `fastplong` QC |
 | `--ont_min_length` / `--ont_max_length` | `100` / `0` (unlimited) | ONT read length bounds for `fastplong` QC |
-| `--ont_adapter_fasta` | `null` | Optional custom ONT adapter FASTA (auto-detected if null) |
+| `--ont_adapter_fasta` | `null` | Optional custom ONT adapter FASTA (skipped unless provided or `--ont_trim_adapters true`) |
 | `--disable_baq` | `true` | Pass `-B` (`--no-BAQ`) to `bcftools mpileup` |
 | `--max_mpileup_depth` | `100000` | Max pileup depth; triggers deterministic strand-balanced downsampling if exceeded |
 | `--downsample_seed` | `42` | Fixed RNG seed for deterministic strand-balanced downsampling |
 | `--use_iupac` | `false` | Enable IUPAC ambiguity codes for mixed biallelic SNPs in consensus |
 | `--min_iupac_freq` / `--max_iupac_freq` | `0.25` / `0.75` | Allele frequency band for IUPAC biallelic SNP coding |
+| `--qc_pass_depth` / `--qc_pass_breadth` / `--qc_pass_max_n` | `100` / `95.0` / `5.0` | Callable-target QC `PASS` thresholds (mean depth, breadth %, internal N %) |
+| `--qc_warn_depth` / `--qc_warn_breadth` / `--qc_warn_max_n` | `25` / `80.0` / `10.0` | Callable-target QC `WARN` thresholds (mean depth, breadth %, internal N %) |
 | `--outdir` | `./results` | Target directory to write execution results |
 | `-profile` | `standard` | Environment configuration profile (e.g., `-profile conda`) |
 

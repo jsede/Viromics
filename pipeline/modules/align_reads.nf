@@ -6,10 +6,12 @@ process INDEX_REFERENCE {
 
     output:
     tuple path(reference), path("${reference}.*"), emit: index
+    path "versions_index_reference.yml", emit: versions
 
     script:
     """
     bwa index ${reference}
+    (bwa 2>&1 || true) | sed -n 's/^Version: /bwa: /p' | head -n 1 > versions_index_reference.yml
     """
 }
 
@@ -26,6 +28,7 @@ process ALIGN_READS {
 
     output:
     tuple val(sample_id), path("${sample_id}_raw.bam"), emit: bam
+    tuple val(sample_id), path("versions_align_reads.yml"), emit: versions
 
     script:
     if (platform == 'illumina') {
@@ -34,6 +37,8 @@ process ALIGN_READS {
         bwa mem -t ${task.cpus} ${reference} ${reads[0]} ${reads[1]} | \\
             samtools view -@ ${task.cpus} -b -F 0x904 -q ${min_map_qual} - | \\
             samtools sort -@ ${task.cpus} -o ${sample_id}_raw.bam -
+        (bwa 2>&1 || true) | sed -n 's/^Version: /bwa: /p' | head -n 1 > versions_align_reads.yml
+        samtools --version 2>&1 | head -n 1 | sed 's/^samtools /samtools: /' >> versions_align_reads.yml
         """
     } else {
         """
@@ -41,6 +46,8 @@ process ALIGN_READS {
         minimap2 -ax map-ont --secondary=no -t ${task.cpus} ${reference} ${reads} | \\
             samtools view -@ ${task.cpus} -b -F 0x904 -q ${min_map_qual} - | \\
             samtools sort -@ ${task.cpus} -o ${sample_id}_raw.bam -
+        minimap2 --version 2>&1 | head -n 1 | sed 's/^/minimap2: /' > versions_align_reads.yml
+        samtools --version 2>&1 | head -n 1 | sed 's/^samtools /samtools: /' >> versions_align_reads.yml
         """
     }
 }

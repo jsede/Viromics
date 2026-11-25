@@ -2,6 +2,13 @@
   {
     "model_id": "sars_cov2_orf1ab",
     "reference": "NC_045512.2",
+    "reference_aliases": ["NC_045512.2", "NC_045512", "MN908947.3", "MN908947"],
+    "reference_patterns": ["^NC_045512(\\.\\d+)?$", "^MN908947(\\.\\d+)?$", "SARS[-_]?CoV[-_]?2.*NC_045512"],
+    "motif_check": {
+      "start": 13462,
+      "end": 13468,
+      "sequence": "TTTAAAC"
+    },
     "feature_names": ["ORF1ab", "orf1ab", "cds-YP_009724389.1"],
     "products": ["ORF1ab polyprotein", "replicase polyprotein 1ab"],
     "strand": "+",

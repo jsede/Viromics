@@ -831,19 +831,19 @@
           <div>
             <span class="flow-step">Raw FASTQ (Illumina/ONT)</span>
             <span class="flow-arrow">➔</span>
-            <span class="flow-step">FASTQ_QC (BBDuk + fastp)</span>
+            <span class="flow-step">FASTQ_QC (fastp / fastplong)</span>
             <span class="flow-arrow">➔</span>
-            <span class="flow-step">INDEX_REFERENCE & ALIGN_READS (BWA/Minimap2)</span>
+            <span class="flow-step">INDEX_REFERENCE &amp; ALIGN_READS (BWA/Minimap2)</span>
             <span class="flow-arrow">➔</span>
             <span class="flow-step">PRIMER_TRIM (ampliconclip)</span>
           </div>
           <div style="margin-top: 1rem;">
             <span class="flow-arrow">↳</span>
-            <span class="flow-step">VARIANT_CALL (mpileup -d 8000 -L 8000)</span>
+            <span class="flow-step">VARIANT_CALL (bcftools -B -X + norm)</span>
             <span class="flow-arrow">➔</span>
-            <span class="flow-step">CONSENSUS_GEN (depth -aa -J + bcftools)</span>
+            <span class="flow-step">CONSENSUS_GEN (depth -aa -J -Q -q + bcftools)</span>
             <span class="flow-arrow">➔</span>
-            <span class="flow-step">AGGREGATE_METRICS (parse_metrics.py)</span>
+            <span class="flow-step">AGGREGATE_METRICS (parse_metrics.py + schema)</span>
             <span class="flow-arrow">➔</span>
             <span class="flow-step">viromics_run_report.json</span>
           </div>
@@ -1022,6 +1022,18 @@ npm run dev
                 <td>Optional CSV mapping <code>sample_id</code> to epidemiological metadata (host, date, location).</td>
               </tr>
               <tr>
+                <td><code>--run_id</code></td>
+                <td>String</td>
+                <td><code>viromics_&lt;sessionId&gt;</code></td>
+                <td>Deterministic run identifier recorded in report provenance (preserves <code>-resume</code> caching across runs).</td>
+              </tr>
+              <tr>
+                <td><code>--cds_models</code></td>
+                <td>Path</td>
+                <td><code>resources/annotation_models/cds_models.json</code></td>
+                <td>Staged curated CDS ribosomal-slippage models JSON passed explicitly to <code>AGGREGATE_METRICS</code>.</td>
+              </tr>
+              <tr>
                 <td><code>--min_coverage</code></td>
                 <td>Integer</td>
                 <td><code>10</code> (Illumina)<br><code>50</code> (ONT)</td>
@@ -1076,6 +1088,18 @@ npm run dev
                 <td>Minimum read length retained after QC and primer clipping (<code>--filter-len</code>).</td>
               </tr>
               <tr>
+                <td><code>--ont_mpileup_config</code></td>
+                <td>String</td>
+                <td><code>'ont-sup'</code></td>
+                <td><code>bcftools mpileup -X</code> profile for ONT (e.g. <code>ont-sup</code>, <code>ont</code>, or <code>none</code>), placed before <code>-Q</code> so <code>--min_base_qual</code> stays honored.</td>
+              </tr>
+              <tr>
+                <td><code>--ont_trim_adapters</code></td>
+                <td>Boolean</td>
+                <td><code>false</code></td>
+                <td>Enable de novo <code>fastplong</code> auto-adapter trimming. Disabled (<code>-A</code>) by default so conserved amplicon ends are not truncated when custom adapter FASTAs are absent.</td>
+              </tr>
+              <tr>
                 <td><code>--ont_min_mean_qual</code></td>
                 <td>Integer</td>
                 <td><code>10</code></td>
@@ -1110,6 +1134,18 @@ npm run dev
                 <td>Boolean</td>
                 <td><code>false</code></td>
                 <td>When <code>true</code>, consensus calling outputs IUPAC ambiguity codes for biallelic SNPs within <code>[--min_iupac_freq 0.25, --max_iupac_freq 0.75)</code>.</td>
+              </tr>
+              <tr>
+                <td><code>--qc_pass_depth</code> / <code>--qc_pass_breadth</code> / <code>--qc_pass_max_n</code></td>
+                <td>Int / Float / Float</td>
+                <td><code>100</code> / <code>95.0</code> / <code>5.0</code></td>
+                <td>Configurable QC <code>PASS</code> thresholds evaluated on the callable target (depth, breadth %, internal N %).</td>
+              </tr>
+              <tr>
+                <td><code>--qc_warn_depth</code> / <code>--qc_warn_breadth</code> / <code>--qc_warn_max_n</code></td>
+                <td>Int / Float / Float</td>
+                <td><code>25</code> / <code>80.0</code> / <code>10.0</code></td>
+                <td>Configurable QC <code>WARN</code> thresholds evaluated on the callable target (depth, breadth %, internal N %).</td>
               </tr>
               <tr>
                 <td><code>--outdir</code></td>
@@ -1232,7 +1268,7 @@ NTC,2026-03-15,Sydney,Control,None</code></pre>
         <div class="callout callout-info">
           <div class="callout-title">Co-Detection Classification Logic</div>
           <p>
-            When a reference multi-FASTA has $N$ target strains, the aggregator computes coverage breadth ($\ge 	ext{minCoverageThreshold}$) independently for every strain. If a sample exhibits <strong>$\ge 50\%$ coverage breadth</strong> across multiple reference contigs, Viromics flags the sample with a <strong>Co-detection Badge</strong> (e.g. <code>Co-detection: RSV-A + RSV-B</code>) and generates dedicated mutation tables for each strain in the genomics report.
+            When a reference multi-FASTA has $N$ target strains, the aggregator computes coverage breadth ($\ge \text{minCoverageThreshold}$) independently for every strain. If a sample exhibits <strong>$\ge 50\%$ coverage breadth</strong> across multiple reference contigs, Viromics flags the sample with a <strong>Co-detection Badge</strong> (e.g. <code>Co-detection: RSV-A + RSV-B</code>) and generates dedicated mutation tables for each strain in the genomics report.
           </p>
         </div>
       </section>
@@ -1246,7 +1282,7 @@ NTC,2026-03-15,Sydney,Control,None</code></pre>
           <div class="card">
             <div class="card-title">1. FASTQ_QC</div>
             <p><strong>Tools:</strong> fastp (Illumina) / fastplong (ONT)<br>
-            Illumina runs <code>fastp</code> directly on raw paired reads with <code>--detect_adapter_for_pe --cut_tail --trim_poly_g</code>. ONT runs <code>fastplong</code> with mean-read quality filtering (<code>--mean_qual</code>), length bounds, and automatic or custom adapter trimming.</p>
+            Illumina runs <code>fastp</code> directly on raw paired reads with <code>--detect_adapter_for_pe --cut_tail --trim_poly_g</code>. ONT runs <code>fastplong</code> with mean-read quality filtering (<code>--mean_qual</code>), length bounds, and <code>-A</code> by default to protect conserved viral amplicon ends.</p>
           </div>
           <div class="card">
             <div class="card-title">2. INDEX & ALIGN</div>
@@ -1270,8 +1306,8 @@ NTC,2026-03-15,Sydney,Control,None</code></pre>
           </div>
           <div class="card">
             <div class="card-title">6. AGGREGATE_METRICS</div>
-            <p><strong>Tools:</strong> parse_metrics.py (Python 3)<br>
-            Extracts GFF features, applies curated ribosomal frameshift models, computes pairwise Hamming distance matrices, and compiles the consolidated JSON report.</p>
+            <p><strong>Tools:</strong> parse_metrics.py + Schema v2.0.0<br>
+            Annotates variants with GFF3 &amp; staged curated frameshift models, computes callable-target QC tiers, indel-safe low-coverage intervals, pairwise SNP distances, tool provenance (<code>versions.yml</code>), and validates against <code>schema/viromics_run_report.schema.json</code>.</p>
           </div>
         </div>
       </section>
@@ -1280,33 +1316,33 @@ NTC,2026-03-15,Sydney,Control,None</code></pre>
       <section id="scientific-assumptions">
         <h2>9. Default Settings & Scientific Assumptions</h2>
 
-        <h3>Sample Quality Classification Rules</h3>
-        <p>The pipeline and dashboard categorize all sample alignments against reference targets into three strict quality tiers:</p>
+        <h3>Sample Quality Classification Rules (Callable Target)</h3>
+        <p>The pipeline evaluates sample alignments against reference targets into three configurable quality tiers (<code>--qc_pass_*</code> / <code>--qc_warn_*</code>). When <code>--primer_bed</code> is supplied, metrics are evaluated across the union of primer-trimmed insert intervals <code>[left_end, right_start]</code> so clipped terminal primer bases never penalize short single-amplicon assays; whole-contig metrics are always reported alongside:</p>
 
         <div class="table-wrapper">
           <table>
             <thead>
               <tr>
                 <th>Tier</th>
-                <th>Mean Depth</th>
-                <th>Coverage Breadth (&ge; minCov)</th>
-                <th>Consensus N Rate</th>
+                <th>Callable Mean Depth</th>
+                <th>Callable Breadth (&ge; minCov)</th>
+                <th>Internal N Rate</th>
                 <th>Clinical Interpretation</th>
               </tr>
             </thead>
             <tbody>
               <tr>
                 <td><strong style="color:var(--brand-emerald)">PASS</strong></td>
-                <td>&ge; 100x</td>
-                <td>&ge; 95.0%</td>
-                <td>&le; 5.0%</td>
+                <td>&ge; 100x (<code>--qc_pass_depth</code>)</td>
+                <td>&ge; 95.0% (<code>--qc_pass_breadth</code>)</td>
+                <td>&le; 5.0% (<code>--qc_pass_max_n</code>)</td>
                 <td>High-confidence genome assembly suitable for molecular epidemiology and clade assignment.</td>
               </tr>
               <tr>
                 <td><strong style="color:var(--brand-amber)">WARN</strong></td>
-                <td>&ge; 25x</td>
-                <td>&ge; 80.0%</td>
-                <td>&le; 10.0%</td>
+                <td>&ge; 25x (<code>--qc_warn_depth</code>)</td>
+                <td>&ge; 80.0% (<code>--qc_warn_breadth</code>)</td>
+                <td>&le; 10.0% (<code>--qc_warn_max_n</code>)</td>
                 <td>Acceptable for variant identification; some low-coverage genomic regions masked with Ns.</td>
               </tr>
               <tr>
@@ -1331,7 +1367,7 @@ NTC,2026-03-15,Sydney,Control,None</code></pre>
 
       <!-- Section: Curated Frameshift Models -->
       <section id="curated-models">
-        <h2>10. Curated CDS Models & Ribosomal Slippage</h2>
+        <h2>10. Curated CDS Models &amp; Ribosomal Slippage</h2>
         <p>
           In viruses such as SARS-CoV-2, key proteins like <strong>ORF1ab polyprotein</strong> are translated via a programmed -1 ribosomal frameshift (ribosomal slippage) at a slippery heptanucleotide motif (<code>UUUAAAC</code>) followed by an RNA pseudoknot. Traditional naive GFF parsers fail because the two coding exons are in different reading frames.
         </p>
@@ -1339,7 +1375,7 @@ NTC,2026-03-15,Sydney,Control,None</code></pre>
         <div class="callout callout-warning">
           <div class="callout-title">Fail-Closed Safety Guarantee</div>
           <p>
-            Viromics follows a strict fail-closed policy. If a GFF feature contains translation exceptions (e.g. <code>exception=ribosomal_slippage</code>) without a verified curated model, it returns:
+            Viromics follows a strict fail-closed policy. GFF3 <code>phase</code> offsets are subtracted from the 5' coding end with strict partial-codon bounds checks, and curated models validate both reference aliases/patterns and slippery-site sequence motifs (<code>motif_check</code>). If a GFF feature indicates a translation exception without a verified curated model, it returns:
             <br>
             <code>{"aa_change": "AA annotation unavailable", "status": "unsupported_programmed_frameshift"}</code>
             <br>
@@ -1347,8 +1383,8 @@ NTC,2026-03-15,Sydney,Control,None</code></pre>
           </p>
         </div>
 
-        <h3>Curated Model Specification (<code>resources/annotation_models/cds_models.json</code>)</h3>
-        <p>To support valid translation of frameshifted polyproteins, Viromics loads external JSON model files:</p>
+        <h3>Curated Model Specification (<code>--cds_models resources/annotation_models/cds_models.json</code>)</h3>
+        <p>Viromics stages curated JSON model files explicitly into <code>AGGREGATE_METRICS</code> for local, Conda, Docker, and HPC portability:</p>
 
         <div class="code-container">
           <div class="code-header"><span>cds_models.json</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
@@ -1356,6 +1392,9 @@ NTC,2026-03-15,Sydney,Control,None</code></pre>
   {
     "model_id": "sars_cov2_orf1ab",
     "reference": "NC_045512.2",
+    "reference_aliases": ["NC_045512.2", "NC_045512", "MN908947.3", "MN908947"],
+    "reference_patterns": ["^NC_045512(\\.\\d+)?$", "^MN908947(\\.\\d+)?$", "SARS[-_]?CoV[-_]?2.*NC_045512"],
+    "motif_check": {"start": 13462, "end": 13468, "sequence": "TTTAAAC"},
     "feature_names": ["ORF1ab", "orf1ab", "cds-YP_009724389.1"],
     "products": ["ORF1ab polyprotein", "replicase polyprotein 1ab"],
     "strand": "+",
@@ -1384,17 +1423,17 @@ NTC,2026-03-15,Sydney,Control,None</code></pre>
 
       <!-- Section: SNP Distance & UPGMA Tree -->
       <section id="snp-distance">
-        <h2>11. Epidemiological Distance Engine & UPGMA Tree</h2>
+        <h2>11. Epidemiological Distance Engine &amp; UPGMA Tree</h2>
 
         <h3>Whole-Genome Pairwise Hamming Distance</h3>
         <p>
           Viromics calculates distance matrices in <code>parse_metrics.py</code> using a robust whole-genome consensus pairwise algorithm designed to eliminate sequencing artifacts:
         </p>
         <ul>
-          <li><strong>Coverage Gate:</strong> Only genomic positions with sequencing depth $\ge 	ext{minCoverageThreshold}$ in <em>both</em> samples are evaluated.</li>
-          <li><strong>Major Allele Filter:</strong> Only major consensus alleles ($	ext{AF} \ge 0.5$) are counted to prevent minor subclonal variants from biasing transmission linkages.</li>
-          <li><strong>Deletion Masking:</strong> Structural deletions and uncalled bases (<code>N</code>) are omitted from the SNP mismatch denominator.</li>
-          <li><strong>Zero-Overlap Assignment:</strong> If two samples share zero mutually covered genomic positions, their distance is assigned as <code>1.0</code> (maximum 100% divergence) rather than <code>0.0</code>.</li>
+          <li><strong>Coverage Gate:</strong> Only genomic positions with sequencing depth $\ge \text{minConsensusDepth}$ in <em>both</em> samples are evaluated.</li>
+          <li><strong>Major Allele Filter:</strong> Only major consensus alleles ($\text{AF} \ge \text{minConsensusFreq}$, default <code>0.50</code>) are counted to prevent minor subclonal variants from biasing transmission linkages.</li>
+          <li><strong>Deletion Masking:</strong> Structural deletions and uncalled bases (<code>N</code>) are omitted from the SNP mismatch numerator and denominator.</li>
+          <li><strong>Missing-Overlap Representation:</strong> Reports emit fractional divergence (<code>distance_matrices</code>), raw integer SNP differences (<code>snp_distance_matrices</code>), and pairwise comparable base counts (<code>compared_sites_matrices</code>). Pairs with zero mutually covered bases receive <code>null</code> rather than conflating missing data with 100% divergence.</li>
         </ul>
 
         <h3>Rooted UPGMA Phylogenetic Reconstruction</h3>
@@ -1404,9 +1443,9 @@ NTC,2026-03-15,Sydney,Control,None</code></pre>
         <ul>
           <li><strong>80% Coverage Safe-Guard:</strong> Samples with $&lt; 80\%$ coverage breadth are filtered out of the tree to prevent missing data from creating artifactual branch lengths.</li>
           <li><strong>Cluster-Size Weighting:</strong> When merging clusters $A$ and $B$, distances to cluster $K$ are proportionally weighted by sample counts:
-            $$d_{(A \cup B), K} = rac{|A| \cdot d_{A, K} + |B| \cdot d_{B, K}}{|A| + |B|}$$
+            $$d_{(A \cup B), K} = \frac{|A| \cdot d_{A, K} + |B| \cdot d_{B, K}}{|A| + |B|}$$
           </li>
-          <li><strong>Calibrated Divergence Scale:</strong> UPGMA node height is defined as $h = d(A, B) / 2$. The tree's time/divergence axis is calibrated by $2	imes$ so displayed tick marks represent true pairwise percent divergence.</li>
+          <li><strong>Calibrated Divergence Scale:</strong> UPGMA node height is defined as $h = d(A, B) / 2$. The tree's time/divergence axis is calibrated by $2\times$ so displayed tick marks represent true pairwise percent divergence.</li>
         </ul>
       </section>
 
@@ -1445,7 +1484,7 @@ NTC,2026-03-15,Sydney,Control,None</code></pre>
       <!-- Section: JSON Schema -->
       <section id="json-schema">
         <h2>13. Run Report JSON Anatomy</h2>
-        <p>The <code>viromics_run_report.json</code> file is strictly validated by <code>validate_report_schema()</code> in <code>parse_metrics.py</code>. Key fields include:</p>
+        <p>The <code>viromics_run_report.json</code> contract is formally defined in <code>schema/viromics_run_report.schema.json</code> (v2.0.0) and validated by <code>validate_report_schema()</code> in <code>parse_metrics.py</code>. Key fields include:</p>
 
         <div class="table-wrapper">
           <table>
@@ -1458,14 +1497,19 @@ NTC,2026-03-15,Sydney,Control,None</code></pre>
             </thead>
             <tbody>
               <tr>
-                <td><code>run_id</code></td>
+                <td><code>schema_version</code> / <code>run_id</code></td>
                 <td>String</td>
-                <td>Unique timestamped identifier for the pipeline run.</td>
+                <td>Schema version (<code>"2.0.0"</code>) and deterministic run identifier.</td>
+              </tr>
+              <tr>
+                <td><code>run_config</code> / <code>software_versions</code></td>
+                <td>Object</td>
+                <td>Complete resolved CLI parameters (including <code>qc_thresholds</code>) and exact tool versions collected from process <code>versions_*.yml</code> files.</td>
               </tr>
               <tr>
                 <td><code>min_coverage_threshold</code></td>
                 <td>Integer</td>
-                <td>The minimum depth threshold applied during this run (e.g. 10 or 100).</td>
+                <td>The minimum depth threshold applied during this run (e.g. 10 or 50).</td>
               </tr>
               <tr>
                 <td><code>references</code></td>
@@ -1473,34 +1517,34 @@ NTC,2026-03-15,Sydney,Control,None</code></pre>
                 <td>List of reference strains with <code>name</code>, <code>length</code>, and <code>sequence</code>.</td>
               </tr>
               <tr>
-                <td><code>distance_matrices</code></td>
+                <td><code>distance_matrices</code> / <code>snp_distance_matrices</code> / <code>compared_sites_matrices</code></td>
                 <td>Object</td>
-                <td>2D distance matrix per reference keyed by positional index matching <code>distance_matrix_order</code>.</td>
+                <td>Fractional divergence (<code>float | null</code>), raw integer SNP differences, and mutually covered site counts per reference (keyed by <code>distance_matrix_order</code> and <code>distance_matrices_by_name</code>).</td>
               </tr>
               <tr>
-                <td><code>distance_matrices_by_name</code></td>
-                <td>Object</td>
-                <td>Dictionary mapping <code>[ref][sampleA][sampleB] -> float_distance</code>.</td>
+                <td><code>samples[].qc_status</code> / <code>qc_reasons</code> / <code>primary_reference</code></td>
+                <td>String / Array</td>
+                <td>Sample QC tier (<code>PASS</code>/<code>WARN</code>/<code>FAIL</code>) on the highest-coverage contig, reason codes, and primary reference name.</td>
               </tr>
               <tr>
                 <td><code>samples[].qc</code></td>
                 <td>Object</td>
-                <td>Includes <code>raw_reads</code>, <code>trimmed_reads</code>, <code>q30_rate_raw</code>, <code>q30_rate_trimmed</code>, <code>duplication_rate</code>.</td>
+                <td>Normalized <code>fastp</code>/<code>fastplong</code> read counts, <code>0.0–1.0</code> <code>q30_rate_*</code>, <code>mean_read_length_*</code>, and <code>duplication_rate</code> (<code>null</code> when omitted by ONT <code>fastplong</code>).</td>
               </tr>
               <tr>
                 <td><code>samples[].coverage[ref]</code></td>
                 <td>Object</td>
-                <td>Contains <code>mean_depth</code>, <code>coverage_breadth_min_cov</code>, and 100bp binned <code>coverage_profile</code>.</td>
+                <td>Whole-contig &amp; callable-target depth/breadth (<code>callable_mean_depth</code>, <code>callable_breadth_min_cov</code>, <code>qc_basis</code>, <code>qc_status</code>), binned <code>coverage_profile</code>, and reference-coordinate <code>low_coverage_intervals</code>.</td>
               </tr>
               <tr>
                 <td><code>samples[].consensus[ref]</code></td>
                 <td>Object</td>
-                <td>Contains <code>length</code>, <code>gc_content</code>, <code>n_content</code>, and complete consensus <code>sequence</code>.</td>
+                <td>Contains <code>length</code>, <code>gc_content</code>, whole-contig <code>n_content</code>, callable-target <code>internal_n_content</code>/<code>internal_n_count</code>/<code>terminal_n_count</code>, and <code>sequence</code>.</td>
               </tr>
               <tr>
                 <td><code>samples[].variants[]</code></td>
                 <td>Array</td>
-                <td>List of variants with <code>position</code>, <code>ref</code>, <code>alt</code>, <code>frequency</code>, <code>depth</code>, <code>gene</code>, <code>aa_change</code>, and <code>status</code>.</td>
+                <td>FILTER-enforced variants computed from <code>FORMAT/AD</code> &amp; <code>FORMAT/DP</code> with <code>is_consensus</code>, <code>gene</code>, <code>aa_change</code> (in-frame vs. frameshift indels), and structured per-gene <code>consequences[]</code>.</td>
               </tr>
             </tbody>
           </table>
@@ -1553,7 +1597,7 @@ NTC,2026-03-15,Sydney,Control,None</code></pre>
             <span class="accordion-icon">▼</span>
           </div>
           <div class="accordion-body">
-            A sample receives a <code>FAIL</code> badge if its mean depth is below 25x, its coverage breadth at the minimum threshold is below 80%, or its consensus FASTA contains more than 10% uncalled bases (<code>N</code>). Hover over the FAIL badge in the dashboard to see the exact offending metric.
+            A sample receives a <code>FAIL</code> badge if its callable mean depth is below <code>--qc_warn_depth</code> (default 25x), its callable breadth at <code>--min_coverage</code> is below <code>--qc_warn_breadth</code> (default 80%), or its internal consensus N rate exceeds <code>--qc_warn_max_n</code> (default 10%). Hover over the FAIL badge or inspect <code>qc_reasons</code> in the report JSON to see the exact failing metric.
           </div>
         </div>
 

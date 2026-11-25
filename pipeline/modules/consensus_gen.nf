@@ -12,6 +12,7 @@ process CONSENSUS_GEN {
 
     output:
     tuple val(sample_id), path("${sample_id}_consensus.fasta"), emit: consensus
+    tuple val(sample_id), path("versions_consensus_gen.yml"), emit: versions
 
     script:
     def hap_arg = use_iupac ? "-H I" : "-H A"
@@ -33,5 +34,9 @@ process CONSENSUS_GEN {
     
     # Replace header to prefix with sample ID and retain clean contig name (strip FASTA description)
     awk '/^>/ {split(substr(\$0, 2), a, /[ \\t]+/); print ">${sample_id}_" a[1]; next} {print}' ${sample_id}_consensus.fasta > tmp_consensus.fasta && mv tmp_consensus.fasta ${sample_id}_consensus.fasta
+
+    samtools --version 2>&1 | head -n 1 | sed 's/^samtools /samtools: /' > versions_consensus_gen.yml
+    bcftools --version 2>&1 | head -n 1 | sed 's/^bcftools /bcftools: /' >> versions_consensus_gen.yml
+    (tabix --version 2>&1 || true) | head -n 1 | sed 's/^tabix[^0-9]*/tabix: /' >> versions_consensus_gen.yml
     """
 }

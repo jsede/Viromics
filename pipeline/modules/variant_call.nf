@@ -18,13 +18,17 @@ process VARIANT_CALL {
     val min_iupac_freq
     val max_iupac_freq
     val platform
+    val ont_mpileup_config
 
     output:
     tuple val(sample_id), path("${sample_id}.vcf"), emit: vcf
     tuple val(sample_id), path("${sample_id}_consensus.vcf"), emit: consensus_vcf
+    tuple val(sample_id), path("versions_variant_call.yml"), emit: versions
 
     script:
-    def platform_mpileup_opts = (platform == 'ont') ? '-X ont-sup' : '-X illumina'
+    def platform_mpileup_opts = (platform == 'ont')
+        ? ((ont_mpileup_config && ont_mpileup_config != 'none') ? "-X ${ont_mpileup_config}" : "")
+        : '-X illumina'
     def baq_opt = disable_baq ? '-B' : ''
     def idepth_cap = (max_mpileup_depth > 0) ? max_mpileup_depth : 1000000
     def iupac_flag = use_iupac ? '--use-iupac' : ''
@@ -43,7 +47,8 @@ process VARIANT_CALL {
         --threads ${task.cpus}
 
     # Call variants with diploid likelihoods (captures Illumina subclonal alleles cleanly),
-    # disable BAQ (-B) by default, emit FORMAT/AD & FORMAT/DP, and normalize/split multiallelics
+    # disable BAQ (-B) by default, emit FORMAT/AD & FORMAT/DP, and normalize/split multiallelics.
+    # NOTE: Keep -X before -Q so explicit min_base_qual overrides -X ont-sup defaults (-Q 0).
     bcftools mpileup -Ou -f clean_ref.fasta ${platform_mpileup_opts} ${baq_opt} \\
         -d ${max_mpileup_depth} -L ${idepth_cap} \\
         -q ${min_map_qual} -Q ${min_base_qual} \\
@@ -68,5 +73,9 @@ process VARIANT_CALL {
         ${iupac_flag} \\
         --min-iupac-freq ${min_iupac_freq} \\
         --max-iupac-freq ${max_iupac_freq}
+
+    bcftools --version 2>&1 | head -n 1 | sed 's/^bcftools /bcftools: /' > versions_variant_call.yml
+    samtools --version 2>&1 | head -n 1 | sed 's/^samtools /samtools: /' >> versions_variant_call.yml
+    python3 --version 2>&1 | head -n 1 | sed 's/^Python /python: /' >> versions_variant_call.yml
     """
 }
