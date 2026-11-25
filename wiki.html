@@ -765,7 +765,7 @@
           <li class="nav-item"><a href="#tools-modules" class="nav-link"><span class="bullet"></span> Pipeline Tools & Steps</a></li>
           <li class="nav-item"><a href="#scientific-assumptions" class="nav-link"><span class="bullet"></span> Scientific Assumptions</a></li>
           <li class="nav-item"><a href="#curated-models" class="nav-link"><span class="bullet"></span> Curated Frameshift Models</a></li>
-          <li class="nav-item"><a href="#snp-distance" class="nav-link"><span class="bullet"></span> Distance Matrix & UPGMA</a></li>
+          <li class="nav-item"><a href="#snp-distance" class="nav-link"><span class="bullet"></span> Distance Matrix &amp; Phylogenetics</a></li>
         </ul>
 
         <div class="nav-group-title">Outputs & Visualization</div>
@@ -795,7 +795,7 @@
           <span class="hero-tag">🧬 Nextflow DSL2</span>
           <span class="hero-tag">🔬 Illumina & Oxford Nanopore</span>
           <span class="hero-tag">⚡ Zero-Database Dashboard</span>
-          <span class="hero-tag">📊 UPGMA SNP Tree</span>
+          <span class="hero-tag">📊 NJ &amp; UPGMA Phylogenetics</span>
           <span class="hero-tag">📑 Programmed Frameshift Engine</span>
         </div>
       </section>
@@ -1421,9 +1421,9 @@ NTC,2026-03-15,Sydney,Control,None</code></pre>
         </div>
       </section>
 
-      <!-- Section: SNP Distance & UPGMA Tree -->
+      <!-- Section: SNP Distance & Phylogenetic Tree -->
       <section id="snp-distance">
-        <h2>11. Epidemiological Distance Engine &amp; UPGMA Tree</h2>
+        <h2>11. Epidemiological Distance Engine &amp; Phylogenetic Tree</h2>
 
         <h3>Whole-Genome Pairwise Hamming Distance</h3>
         <p>
@@ -1436,16 +1436,17 @@ NTC,2026-03-15,Sydney,Control,None</code></pre>
           <li><strong>Missing-Overlap Representation:</strong> Reports emit fractional divergence (<code>distance_matrices</code>), raw integer SNP differences (<code>snp_distance_matrices</code>), and pairwise comparable base counts (<code>compared_sites_matrices</code>). Pairs with zero mutually covered bases receive <code>null</code> rather than conflating missing data with 100% divergence.</li>
         </ul>
 
-        <h3>Rooted UPGMA Phylogenetic Reconstruction</h3>
+        <h3>Midpoint-Rooted Neighbor-Joining &amp; Optional UPGMA Clustering</h3>
         <p>
-          The client-side dashboard parses <code>report.distance_matrices</code> and applies Unweighted Pair Group Method with Arithmetic Mean (UPGMA) clustering:
+          The client-side dashboard parses <code>report.distance_matrices</code>, <code>snp_distance_matrices</code>, and <code>compared_sites_matrices</code>, defaulting to <strong>Midpoint-Rooted Neighbor-Joining (NJ)</strong> with an interactive toggle to switch to <strong>Rooted UPGMA</strong>:
         </p>
         <ul>
-          <li><strong>80% Coverage Safe-Guard:</strong> Samples with $&lt; 80\%$ coverage breadth are filtered out of the tree to prevent missing data from creating artifactual branch lengths.</li>
-          <li><strong>Cluster-Size Weighting:</strong> When merging clusters $A$ and $B$, distances to cluster $K$ are proportionally weighted by sample counts:
+          <li><strong>Coverage &amp; Overlap Safe-Guards:</strong> Samples below the interactive minimum coverage breadth threshold (default <code>80%</code>) or pairwise comparisons below the minimum comparable sites threshold (or with <code>null</code> pairwise distance) are excluded to prevent dropout artifacts from distorting branch lengths.</li>
+          <li><strong>Neighbor-Joining (Default):</strong> Applies Saitou &amp; Nei Q-criterion agglomerative clustering without assuming a strict molecular clock, followed by deterministic midpoint rooting across the longest pairwise tree path so differential viral substitution rates across lineages remain accurately scaled.</li>
+          <li><strong>UPGMA (Optional Toggle):</strong> Merges clusters using cluster-size weighted arithmetic means,
             $$d_{(A \cup B), K} = \frac{|A| \cdot d_{A, K} + |B| \cdot d_{B, K}}{|A| + |B|}$$
-          </li>
-          <li><strong>Calibrated Divergence Scale:</strong> UPGMA node height is defined as $h = d(A, B) / 2$. The tree's time/divergence axis is calibrated by $2\times$ so displayed tick marks represent true pairwise percent divergence.</li>
+            with node height $h = d(A, B)/2$ and $2\times$ divergence axis calibration.</li>
+          <li><strong>Machine-Readable Exports:</strong> Supports one-click download of rooted Newick trees (<code>.nwk</code>), pairwise distance &amp; SNP CSV matrices, calibrated tree SVGs, and cohort multi-FASTA alignments.</li>
         </ul>
       </section>
 
@@ -1554,28 +1555,28 @@ NTC,2026-03-15,Sydney,Control,None</code></pre>
       <!-- Section: Web Dashboard Guide -->
       <section id="dashboard-guide">
         <h2>14. Interactive Web Dashboard Guide</h2>
-        <p>The React web application provides 5 integrated analytical views:</p>
+        <p>The React web application is fully driven by <code>viromics_run_report.json</code> (v2.0.0 schema with graceful v1 fallback), reading <code>run_config</code>, <code>qc_thresholds</code>, and <code>software_versions</code> dynamically across 5 integrated analytical views:</p>
 
         <div class="card-grid">
           <div class="card">
             <div class="card-title">1. Run Overview</div>
-            <p>Cohort quality pass rates, reference strain summary, and a sortable QC table displaying mapped reads, mean depth, breadth at $\ge 	ext{minCov}$, and PASS/WARN/FAIL status badges with interactive tooltips.</p>
+            <p>Cohort QC pass rates, dynamic run provenance (platform, variant caller, resolved thresholds, tool versions), deterministic report IDs, reference strain filtering, cohort multi-FASTA download, and a sortable QC table displaying callable &amp; whole-contig breadth/depth alongside server-computed <code>PASS</code>/<code>WARN</code>/<code>FAIL</code> badges and <code>qc_reasons</code> tooltips.</p>
           </div>
           <div class="card">
             <div class="card-title">2. Sample Details</div>
-            <p>Granular sample inspection featuring an interactive Recharts depth profile with low-coverage shading, a staggered SVG Gene Map with variant pins, and a searchable VCF table with CSV export.</p>
+            <p>Granular sample inspection featuring an interactive Recharts depth profile with internal dropout shading (<code>&lt;ReferenceArea /&gt;</code>), an <strong>Amplicon Panel QC</strong> bar chart and sortable table (when primer/amplicon stats are present), a staggered multi-track SVG Gene Map with exon connectors, sample FASTA export, SVG downloads, and a searchable variant table displaying structured <code>consequences[]</code>, Consensus/Subclonal badges, and RFC-4180 CSV export.</p>
           </div>
           <div class="card">
             <div class="card-title">3. Mutational Sharing</div>
-            <p>Epidemiological variant sharing matrix. Differentiates clonal mutations (&ge;90%), subclonal mutations (&lt;90%), true wild-type reference alleles, and sequencing dropout masked as <code>N</code>.</p>
+            <p>Epidemiological variant sharing matrix with indel-safe reference-coordinate dropout lookup via <code>low_coverage_intervals</code>. Includes interactive controls for Min Breadth %, Clonal AF % threshold, and All Variants vs. Consensus Only filtering.</p>
           </div>
           <div class="card">
             <div class="card-title">4. Phylogenetic Tree</div>
-            <p>Rooted UPGMA dendrogram calculated from the whole-genome distance matrix. Filtered to samples with &ge;80% coverage to prevent dropout artifacts, with calibrated pairwise divergence scale.</p>
+            <p>Midpoint-rooted Neighbor-Joining tree (default) with an optional Rooted UPGMA toggle, interactive Min Breadth % and Min Compared Sites guards, a Nearest Genetic Relatives table (<code>% div</code>, SNP counts, and mutually covered sites), and Newick (<code>.nwk</code>), Distance CSV, SVG, and Cohort FASTA exports.</p>
           </div>
           <div class="card">
             <div class="card-title">5. Genomics Report Card</div>
-            <p>Printable clinical epidemiology report card. Summarizes sample identifiers, sequencing quality assurance, and detected mutations with one-click clean PDF export.</p>
+            <p>Printable clinical epidemiology report card with multi-page PDF pagination. Summarizes deterministic sample/run provenance, QC assessment, and Consensus/Subclonal mutations with clean light-mode print styling.</p>
           </div>
         </div>
 
@@ -1607,7 +1608,7 @@ NTC,2026-03-15,Sydney,Control,None</code></pre>
             <span class="accordion-icon">▼</span>
           </div>
           <div class="accordion-body">
-            To prevent severe phylogenetic distortion, the UPGMA dendrogram strictly excludes samples with less than 80% coverage breadth across the active reference genome. These excluded samples are listed in a notification banner at the top of the tree tab.
+            To prevent severe phylogenetic distortion, the phylogenetic tree (Neighbor-Joining / UPGMA) excludes samples below the configured minimum coverage breadth threshold (default <code>80%</code>) across the active reference genome, as well as any pairs with <code>null</code> pairwise distance or fewer mutually covered bases than the Min Compared Sites threshold. Excluded samples and reasons are listed in a notification banner at the top of the tree tab.
           </div>
         </div>
 

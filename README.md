@@ -17,12 +17,12 @@ An integrated suite for genomic epidemiology of viral pathogens. It combines a m
 - **Epidemiological Distance & Schema Provenance**: Whole-genome SNP distance matrices (`distance_matrices`, `snp_distance_matrices`, `compared_sites_matrices`) emitting `null` for zero-overlap pairs, full `run_config` + `software_versions` provenance, and formal validation against [`schema/viromics_run_report.schema.json`](schema/viromics_run_report.schema.json).
 
 ### React Web Dashboard
-- **Zero-Database Design**: Client-side application that processes the pipeline's structured run report (`viromics_run_report.json`) entirely within the browser.
-- **Dynamic Multi-Strain Visualization**: Automatically adapts to multi-FASTA reference runs, enabling co-detection flagging and reference strain filtering across tabs.
-- **Integrated Linear Genome Browser**: Staggered gene annotation track with coordinate alignment and interactive variant hover cards.
-- **Phylogenetic Tree Reconstruction**: Pre-calculated Whole-Genome SNP-only distance matrix parsed to construct a rooted UPGMA tree.
-- **Epidemiological Safe-Guard**: Restricts UPGMA tree placement to samples with $\ge 80\%$ coverage breadth to prevent topological distortions from low-coverage dropouts.
-- **Genomics Report Card**: A printable genomics overview summarizing sample metrics, sequencing quality assurance, and detected mutations with synonymous and non-synonymous visual indicators.
+- **Zero-Database, Schema-Driven Design**: Client-side application that dynamically consumes `viromics_run_report.json` (`v2.0.0` schema with `v1` fallback), adapting QC tiers, thresholds, run configuration, and software provenance automatically.
+- **Dynamic Multi-Strain Visualization & Amplicon QC**: Adapts to multi-FASTA reference runs, flags co-detections, shades internal coverage dropouts, and visualizes per-amplicon depth and coverage tiers.
+- **Integrated Linear Genome Browser & Indel-Safe Matrix**: Multi-track staggered SVG gene map with exon connectors, interactive variant tables with structured `consequences[]`, and an indel-safe mutational sharing matrix powered by `low_coverage_intervals`.
+- **Midpoint-Rooted NJ & UPGMA Phylogenetics**: Defaults to Midpoint-Rooted Neighbor-Joining with an interactive UPGMA toggle, backed by whole-genome SNP distances, pairwise `compared_sites` overlap guards, and Newick/CSV/SVG/FASTA exports.
+- **Epidemiological Safe-Guard**: Excludes samples below the coverage breadth threshold (default $\ge 80\%$) or without sufficient mutually covered bases from tree reconstruction to prevent topological distortions.
+- **Genomics Report Card**: A printable, multi-page paginated genomics overview summarizing deterministic run provenance, sequencing quality assurance, and Consensus vs. Subclonal mutations.
 
 ---
 
@@ -192,9 +192,11 @@ To test the dashboard visualizations without executing NGS runs, generate synthe
    ```
    This generates `dashboard/public/mock_run_report.json` representing a multiplexed Respiratory Syncytial Virus (RSV-A and RSV-B) run.
 
-2. **Launch Development Server**:
+2. **Lint, Test, & Launch Development Server**:
    ```bash
    cd dashboard
+   npm run lint
+   npm run test
    npm run dev
    ```
-   Open [http://localhost:5173](http://localhost:5173), upload `mock_run_report.json`, and interact with the comparative heatmaps, alignments, and trees.
+   Open [http://localhost:5173](http://localhost:5173), upload `mock_run_report.json` (or your pipeline's `viromics_run_report.json`), and interact with the comparative heatmaps, amplicon QC charts, genome maps, and phylogenetic trees.

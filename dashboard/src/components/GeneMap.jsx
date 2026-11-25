@@ -1,228 +1,300 @@
-import React, { useState } from 'react';
-import { HelpCircle, Info } from 'lucide-react';
+import React, { useMemo, useRef, useState } from 'react';
+import { HelpCircle, Info, Download } from 'lucide-react';
+import { formatConsequences } from '../utils/reportSchema';
+import { serializeSvgElement, triggerBrowserDownload } from '../utils/exporters';
 
-export default function GeneMap({ genes, variants, refLength }) {
-  const [hoveredGene, setHoveredGene] = useState(null);
+const FEATURE_PALETTE = [
+  { fill: '#DC2626', stroke: '#B91C1C', badge: 'bg-red-100 text-red-700' },
+  { fill: '#4F46E5', stroke: '#4338CA', badge: 'bg-indigo-100 text-indigo-700' },
+  { fill: '#059669', stroke: '#047857', badge: 'bg-emerald-100 text-emerald-700' },
+  { fill: '#7C3AED', stroke: '#6D28D9', badge: 'bg-violet-100 text-violet-700' },
+  { fill: '#D97706', stroke: '#B45309', badge: 'bg-amber-100 text-amber-700' },
+  { fill: '#0284C7', stroke: '#0369A1', badge: 'bg-sky-100 text-sky-700' },
+];
+
+function getFeatureDisplayName(gene) {
+  const name = gene.name || 'Unknown';
+  const prod = (gene.product || '').toLowerCase();
+  if (name === 'ORF1ab' && prod.includes('orf1a polyprotein')) return 'ORF1a';
+  return name;
+}
+
+function packFeatureTracks(genes) {
+  if (!Array.isArray(genes) || genes.length === 0) return { packed: [], numTracks: 1 };
+
+  // Group multi-part CDS (e.g. ORF1ab) so exon segments share the same visual track & connector
+  const groupsMap = new Map();
+  genes.forEach((g, idx) => {
+    const key = g.grouping_key
+      ? `${g.strand || '+'}::${g.grouping_key}`
+      : `single_${idx}`;
+    if (!groupsMap.has(key)) {
+      groupsMap.set(key, {
+        key,
+        label: getFeatureDisplayName(g),
+        strand: g.strand || '+',
+        product: g.product || '',
+        protein_id: g.protein_id || '',
+        parts: [],
+        minStart: g.start,
+        maxEnd: g.end,
+      });
+    }
+    const grp = groupsMap.get(key);
+    grp.parts.push(g);
+    grp.minStart = Math.min(grp.minStart, g.start);
+    grp.maxEnd = Math.max(grp.maxEnd, g.end);
+  });
+
+  const groups = [...groupsMap.values()].sort((a, b) => a.minStart - b.minStart || b.maxEnd - a.maxEnd);
+  const trackEnds = [];
+  const packed = groups.map((grp, colorIdx) => {
+    let assignedTrack = trackEnds.findIndex((endPos) => grp.minStart > endPos);
+    if (assignedTrack === -1) {
+      assignedTrack = trackEnds.length;
+      trackEnds.push(grp.maxEnd);
+    } else {
+      trackEnds[assignedTrack] = grp.maxEnd;
+    }
+    return {
+      ...grp,
+      track: assignedTrack,
+      color: FEATURE_PALETTE[colorIdx % FEATURE_PALETTE.length],
+    };
+  });
+
+  return { packed, numTracks: Math.max(1, trackEnds.length) };
+}
+
+export default function GeneMap({ genes, variants, refLength, sampleId = 'sample', selectedRefName = 'contig' }) {
+  const [hoveredGroup, setHoveredGroup] = useState(null);
   const [hoveredVariant, setHoveredVariant] = useState(null);
+  const svgRef = useRef(null);
+
+  const { packed, numTracks } = useMemo(() => packFeatureTracks(genes || []), [genes]);
 
   if (!genes || genes.length === 0) {
     return (
-      <div className="p-6 glass-panel rounded-2xl text-center text-gray-400">
-        <Info className="w-6 h-6 mx-auto mb-2 text-brand-teal animate-pulse" />
-        <p>No annotation (GFF) file loaded. Custom genome browser disabled.</p>
+      <div className="p-6 glass-panel rounded-2xl text-center text-slate-500">
+        <Info className="w-6 h-6 mx-auto mb-2 text-red-600" />
+        <p>No annotation (GFF3) file loaded. Custom genome browser disabled.</p>
       </div>
     );
   }
 
-  // Color mapping based on gene names (so key genes like Spike, Nucleocapsid stand out!)
-  const getGeneColor = (name) => {
-    const n = name.toLowerCase();
-    if (n === 'spike' || n === 's') return 'fill-brand-teal stroke-brand-teal';
-    if (n === 'nucleocapsid' || n === 'n') return 'fill-brand-violet stroke-brand-violet';
-    if (n.startsWith('orf1')) return 'fill-brand-indigo/60 stroke-brand-indigo/70';
-    if (n === 'envelope' || n === 'e') return 'fill-brand-amber stroke-brand-amber';
-    if (n === 'membrane' || n === 'm') return 'fill-brand-emerald stroke-brand-emerald';
-    return 'fill-gray-600 stroke-gray-500';
-  };
+  const safeRefLength = refLength && refLength > 0
+    ? refLength
+    : Math.max(...genes.map((g) => g.end), 1);
 
-  const getGeneBgColor = (name) => {
-    const n = name.toLowerCase();
-    if (n === 'spike' || n === 's') return 'bg-brand-teal/20 text-brand-teal';
-    if (n === 'nucleocapsid' || n === 'n') return 'bg-brand-violet/20 text-brand-violet';
-    if (n.startsWith('orf1')) return 'bg-brand-indigo/20 text-brand-indigo';
-    if (n === 'envelope' || n === 'e') return 'bg-brand-amber/20 text-brand-amber';
-    if (n === 'membrane' || n === 'm') return 'bg-brand-emerald/20 text-brand-emerald';
-    return 'bg-gray-600/20 text-gray-400';
+  const trackHeight = 30;
+  const topPad = 24;
+  const axisY = topPad + numTracks * trackHeight + 16;
+  const svgHeight = axisY + 65;
+
+  const handleExportSvg = () => {
+    if (!svgRef.current) return;
+    const svgText = serializeSvgElement(svgRef.current);
+    triggerBrowserDownload(svgText, `viromics_${sampleId}_${selectedRefName}_genemap.svg`, 'image/svg+xml;charset=utf-8;');
   };
 
   return (
-    <div className="p-6 glass-panel rounded-2xl flex flex-col gap-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="p-6 glass-panel rounded-2xl flex flex-col gap-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h3 className="text-lg font-semibold font-outfit text-white">Genome Feature Browser</h3>
-          <p className="text-xs text-gray-400">
-            Linear view of genes annotated from GFF with mapped variant positions (vertical markers)
+          <h3 className="text-lg font-semibold text-slate-900">Genome Feature Browser</h3>
+          <p className="text-xs text-slate-500">
+            Non-overlapping staggered track view of GFF3 CDS/gene features with mapped variant positions
           </p>
         </div>
+        <button
+          onClick={handleExportSvg}
+          className="self-start sm:self-auto flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 text-slate-700 text-xs font-semibold rounded-lg hover:bg-slate-50 transition-colors"
+        >
+          <Download className="w-3.5 h-3.5 text-red-600" />
+          Export SVG
+        </button>
       </div>
 
-      {/* SVG Canvas for Linear Map */}
-      <div className="relative w-full overflow-x-auto py-4 select-none">
-        <svg viewBox={`0 0 1000 160`} width="100%" className="min-w-[800px]">
-          {/* Main Genome Axis */}
-          <line 
-            x1="20" y1="80" x2="980" y2="80" 
-            stroke="#CBD5E1" strokeWidth="5" strokeLinecap="round" 
-          />
-          
-          {/* Genome coordinate ticks */}
+      <div className="relative w-full overflow-x-auto py-2 select-none">
+        <svg ref={svgRef} viewBox={`0 0 1000 ${svgHeight}`} width="100%" className="min-w-[800px]">
+          <line x1="20" y1={axisY} x2="980" y2={axisY} stroke="#CBD5E1" strokeWidth="5" strokeLinecap="round" />
+
           {[0, 0.25, 0.5, 0.75, 1].map((pct, i) => {
-            const pos = Math.round(pct * refLength);
+            const pos = Math.round(pct * safeRefLength);
             const x = 20 + pct * 960;
             return (
               <g key={i}>
-                <line x1={x} y1={80} x2={x} y2={86} stroke="#94A3B8" strokeWidth="1.5" />
-                <text 
-                  x={x} y={145} 
-                  fill="#64748B" fontSize="9" textAnchor="middle" 
-                  fontFamily="Fira Code"
-                >
+                <line x1={x} y1={axisY} x2={x} y2={axisY + 6} stroke="#94A3B8" strokeWidth="1.5" />
+                <text x={x} y={axisY + 52} fill="#64748B" fontSize="9.5" textAnchor="middle" fontFamily="Fira Code, monospace">
                   {pos.toLocaleString()} bp
                 </text>
               </g>
             );
           })}
 
-          {/* Gene Blocks */}
-          {genes.map((gene, idx) => {
-            // Scale positions to [20, 980]
-            const startPct = gene.start / refLength;
-            const endPct = gene.end / refLength;
-            const x = 20 + startPct * 960;
-            const width = Math.max(8, (endPct - startPct) * 960);
-            
-            // Draw genes alternated top/bottom or height offset to avoid overlapping names
-            const isAlternate = idx % 2 === 0;
-            const y = isAlternate ? 20 : 48;
-            const h = 12;
-            
-            const isHovered = hoveredGene && hoveredGene.name === gene.name;
+          {packed.map((grp) => {
+            const y = topPad + grp.track * trackHeight;
+            const h = 13;
+            const isHovered = hoveredGroup && hoveredGroup.key === grp.key;
+            const spanX = 20 + (grp.minStart / safeRefLength) * 960;
+            const spanW = Math.max(8, ((grp.maxEnd - grp.minStart) / safeRefLength) * 960);
 
             return (
-              <g 
-                key={idx}
-                onMouseEnter={() => setHoveredGene(gene)}
-                onMouseLeave={() => setHoveredGene(null)}
-                className="cursor-pointer transition-all duration-200"
+              <g
+                key={grp.key}
+                onMouseEnter={() => setHoveredGroup(grp)}
+                onMouseLeave={() => setHoveredGroup(null)}
+                className="cursor-pointer"
               >
-                <rect 
-                  x={x} y={y} width={width} height={h} rx="3"
-                  className={`gene-block ${getGeneColor(gene.name)} ${
-                    isHovered ? 'fill-opacity-85 stroke-opacity-100' : 'fill-opacity-40 stroke-opacity-60'
-                  } stroke-[1.5]`}
-                />
-                
-                {/* Gene Name Label inside/above block */}
-                {width > 25 && (
-                  <text 
-                    x={x + width/2} y={y - 8}
-                    fill={isHovered ? '#DC2626' : '#475569'}
-                    fontSize="9.5" fontWeight={isHovered ? '700' : '600'}
+                {grp.parts.length > 1 && (
+                  <line
+                    x1={spanX}
+                    y1={y + h / 2}
+                    x2={spanX + spanW}
+                    y2={y + h / 2}
+                    stroke={grp.color.stroke}
+                    strokeWidth="1.5"
+                    strokeDasharray="3 2"
+                  />
+                )}
+                {grp.parts.map((part, pIdx) => {
+                  const x = 20 + (part.start / safeRefLength) * 960;
+                  const width = Math.max(6, ((part.end - part.start) / safeRefLength) * 960);
+                  return (
+                    <rect
+                      key={`${grp.key}-p-${pIdx}`}
+                      x={x}
+                      y={y}
+                      width={width}
+                      height={h}
+                      rx="3"
+                      fill={grp.color.fill}
+                      fillOpacity={isHovered ? 0.85 : 0.4}
+                      stroke={grp.color.stroke}
+                      strokeOpacity={isHovered ? 1 : 0.75}
+                      strokeWidth="1.5"
+                      className="gene-block"
+                    />
+                  );
+                })}
+                {spanW > 24 && (
+                  <text
+                    x={spanX + spanW / 2}
+                    y={y - 5}
+                    fill={isHovered ? '#DC2626' : '#334155'}
+                    fontSize="9.5"
+                    fontWeight={isHovered ? '700' : '600'}
                     textAnchor="middle"
-                    className="transition-colors"
                   >
-                    {gene.name}
+                    {grp.label}
                   </text>
                 )}
               </g>
             );
           })}
 
-          {/* Variant Marker Pins along the axis (Pointing Downwards to prevent overlaps) */}
-          {variants && variants.map((v, idx) => {
-            const pct = v.position / refLength;
-            const x = 20 + pct * 960;
-            const y = 80;
-            
-            const isHovered = hoveredVariant && hoveredVariant.position === v.position;
-
-            return (
-              <g
-                key={idx}
-                onMouseEnter={() => setHoveredVariant(v)}
-                onMouseLeave={() => setHoveredVariant(null)}
-                className="cursor-pointer"
-              >
-                {/* Vertical Pin Line */}
-                <line 
-                  x1={x} y1={y} x2={x} y2={115} 
-                  stroke={isHovered ? '#DC2626' : '#94A3B8'} 
-                  strokeWidth={isHovered ? 2.5 : 1.5}
-                />
-                {/* Pin Head */}
-                <circle 
-                  cx={x} cy={115} 
-                  r={isHovered ? 5.5 : 3.5} 
-                  fill={isHovered ? '#DC2626' : '#94A3B8'}
-                  className="transition-all duration-150"
-                />
-              </g>
-            );
-          })}
+          {variants &&
+            variants.map((v, idx) => {
+              const x = 20 + (v.position / safeRefLength) * 960;
+              const isHovered = hoveredVariant && hoveredVariant.position === v.position && hoveredVariant.alt === v.alt;
+              return (
+                <g
+                  key={idx}
+                  onMouseEnter={() => setHoveredVariant(v)}
+                  onMouseLeave={() => setHoveredVariant(null)}
+                  className="cursor-pointer"
+                >
+                  <line
+                    x1={x}
+                    y1={axisY}
+                    x2={x}
+                    y2={axisY + 28}
+                    stroke={isHovered ? '#DC2626' : '#64748B'}
+                    strokeWidth={isHovered ? 2.5 : 1.5}
+                  />
+                  <circle
+                    cx={x}
+                    cy={axisY + 28}
+                    r={isHovered ? 5.5 : 3.5}
+                    fill={isHovered ? '#DC2626' : '#64748B'}
+                  />
+                </g>
+              );
+            })}
         </svg>
       </div>
 
-      {/* Tooltip detail sections */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-        {/* Gene Tooltip Detail */}
-        <div className="p-4 bg-dark-bg/60 border border-dark-border rounded-xl min-h-24 transition-all">
-          {hoveredGene ? (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl min-h-24">
+          {hoveredGroup ? (
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center gap-2">
-                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getGeneBgColor(hoveredGene.name)}`}>
-                  GENE
+                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${hoveredGroup.color.badge}`}>
+                  CDS ({hoveredGroup.parts.length} {hoveredGroup.parts.length === 1 ? 'interval' : 'intervals'})
                 </span>
-                <h4 className="text-sm font-bold text-white font-outfit">{hoveredGene.name}</h4>
+                <h4 className="text-sm font-bold text-slate-900">{hoveredGroup.label}</h4>
               </div>
-              <p className="text-xs text-gray-300 font-medium">{hoveredGene.product || 'No product product information'}</p>
-              <div className="flex items-center gap-4 text-[10px] font-mono text-gray-400 mt-1">
-                <span>Start: {hoveredGene.start.toLocaleString()} bp</span>
-                <span>End: {hoveredGene.end.toLocaleString()} bp</span>
-                <span>Strand: ({hoveredGene.strand})</span>
+              <p className="text-xs text-slate-700 font-medium">
+                {hoveredGroup.product || 'No product annotation available'}
+              </p>
+              <div className="flex flex-wrap items-center gap-4 text-[10px] font-mono text-slate-500 mt-0.5">
+                <span>Span: {hoveredGroup.minStart.toLocaleString()}–{hoveredGroup.maxEnd.toLocaleString()} bp</span>
+                <span>Strand: ({hoveredGroup.strand})</span>
+                {hoveredGroup.protein_id && <span>Protein: {hoveredGroup.protein_id}</span>}
               </div>
             </div>
           ) : (
-            <div className="flex items-center gap-2 text-gray-400 text-xs h-full py-4 justify-center">
-              <HelpCircle className="w-4 h-4 text-brand-indigo" />
-              <span>Hover over a gene block to inspect details</span>
+            <div className="flex items-center gap-2 text-slate-500 text-xs h-full py-4 justify-center">
+              <HelpCircle className="w-4 h-4 text-indigo-600" />
+              <span>Hover over a feature block to inspect CDS intervals and product details</span>
             </div>
           )}
         </div>
 
-        {/* Variant Tooltip Detail */}
-        <div className="p-4 bg-dark-bg/60 border border-dark-border rounded-xl min-h-24 transition-all">
+        <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl min-h-24">
           {hoveredVariant ? (
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-brand-rose/20 text-brand-rose">
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700">
                   VARIANT
                 </span>
-                <h4 className="text-sm font-bold text-white font-mono">
+                <h4 className="text-sm font-bold text-slate-900 font-mono">
                   g.{hoveredVariant.position}{hoveredVariant.ref}&gt;{hoveredVariant.alt}
                 </h4>
               </div>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs mt-1">
-                <span className="text-gray-400">Gene Region: <strong className="text-gray-200">{hoveredVariant.gene}</strong></span>
-                <span className="text-gray-400">Variant Class: <strong className="text-gray-200">{hoveredVariant.type}</strong></span>
-                <span className="text-gray-400">Allele Freq: <strong className="text-brand-teal font-mono">{(hoveredVariant.frequency * 100).toFixed(1)}%</strong></span>
-                <span className="text-gray-400">Coverage Depth: <strong className="text-gray-200 font-mono">{hoveredVariant.depth}x</strong></span>
-                {hoveredVariant.aa_change && (
-                  <span className="text-gray-400 col-span-2">
-                    Protein Change:{' '}
-                    <strong className={
-                      hoveredVariant.aa_change.includes('(syn)') || hoveredVariant.aa_change === 'AA annotation unavailable'
-                        ? 'text-gray-400 font-medium'
-                        : hoveredVariant.aa_change === 'Indel'
-                        ? 'text-brand-amber font-medium'
-                        : 'text-brand-indigo font-bold'
-                    }>
-                      {hoveredVariant.aa_change.includes('(syn)') 
-                        ? `${hoveredVariant.aa_change.replace(' (syn)', '')} (Synonymous)` 
-                        : hoveredVariant.aa_change === 'AA annotation unavailable'
-                        ? `AA unavailable${hoveredVariant.status ? ` (${hoveredVariant.status})` : ''}`
-                        : hoveredVariant.aa_change === 'Indel'
-                        ? 'Indel'
-                        : `${hoveredVariant.aa_change.split('/').map(a => a.startsWith('p.') ? a : `p.${a}`).join('/')} (Non-synonymous)`}
-                    </strong>
-                  </span>
-                )}
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs mt-0.5">
+                <span className="text-slate-500">Gene Region: <strong className="text-slate-900">{hoveredVariant.gene}</strong></span>
+                <span className="text-slate-500">Class: <strong className="text-slate-900">{hoveredVariant.type}</strong></span>
+                <span className="text-slate-500">Allele Freq: <strong className="text-red-600 font-mono">{(hoveredVariant.frequency * 100).toFixed(1)}%</strong></span>
+                <span className="text-slate-500">Depth: <strong className="text-slate-900 font-mono">{hoveredVariant.depth}x</strong></span>
               </div>
+              {(() => {
+                const cons = formatConsequences(hoveredVariant);
+                if (cons.length === 0) return null;
+                return (
+                  <div className="flex flex-wrap gap-1.5 mt-1">
+                    {cons.map((c, idx) => (
+                      <span
+                        key={idx}
+                        className={`text-[10px] px-2 py-0.5 rounded border font-mono ${
+                          c.kind === 'unavailable' || c.kind === 'synonymous'
+                            ? 'bg-slate-100 text-slate-500 border-slate-200'
+                            : c.kind === 'frameshift' || c.kind === 'indel'
+                            ? 'bg-amber-50 text-amber-700 border-amber-200 font-semibold'
+                            : 'bg-indigo-50 text-indigo-700 border-indigo-200 font-bold'
+                        }`}
+                      >
+                        {c.gene}: {c.label}
+                      </span>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           ) : (
-            <div className="flex items-center gap-2 text-gray-400 text-xs h-full py-4 justify-center">
-              <HelpCircle className="w-4 h-4 text-brand-rose" />
-              <span>Hover over a marker pin (vertical bar) to inspect mutation details</span>
+            <div className="flex items-center gap-2 text-slate-500 text-xs h-full py-4 justify-center">
+              <HelpCircle className="w-4 h-4 text-red-600" />
+              <span>Hover over a variant marker pin to inspect structured consequences</span>
             </div>
           )}
         </div>
