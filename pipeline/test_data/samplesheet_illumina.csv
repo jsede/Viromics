@@ -1,0 +1,4 @@
+sample_id,platform,fastq_1,fastq_2
+SynthPos,illumina,pipeline/test_data/illumina/SynthPos_R1.fastq.gz,pipeline/test_data/illumina/SynthPos_R2.fastq.gz
+SynthDropout,illumina,pipeline/test_data/illumina/SynthDropout_R1.fastq.gz,pipeline/test_data/illumina/SynthDropout_R2.fastq.gz
+SynthNTC,illumina,pipeline/test_data/illumina/SynthNTC_R1.fastq.gz,pipeline/test_data/illumina/SynthNTC_R2.fastq.gz

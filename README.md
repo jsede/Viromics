@@ -14,7 +14,8 @@ An integrated suite for genomic epidemiology of viral pathogens. It combines a m
 - **Primer & Amplicon Analysis**: Strand-aware, tolerance-adjusted primer clipping (`samtools ampliconclip --both-ends --strand --soft-clip --tolerance`) with paired-end mate fixing (`samtools fixmate`), two-pass primer pairing (ARTIC `_LEFT_1`/`-alt1`, pre-direction `_01_LEFT`, F/R), and trimmed-insert callable-target QC tiers (`PASS`/`WARN`/`FAIL`).
 - **Variant Calling & Translation**: Hardened `bcftools` (`-B` no-BAQ, configurable `--ont_mpileup_config`, `bcftools norm -m -any`, deterministic strand-balanced downsampling on ultra-deep amplicons), `FORMAT/AD` + `FORMAT/DP` filtering, GFF3 `phase`-accurate translation with staged `--cds_models` + slippery-site verification, in-frame vs. frameshift indel classification, and structured overlapping-gene consequences.
 - **Resilient Consensus Assembly**: Strict decoupling of reported subclonal variants (`AF >= min_freq`) from consensus assembly (`AF >= min_consensus_freq`, default `0.50`), optional biallelic SNP IUPAC ambiguity coding (`--use_iupac`), and deletion-safe low-coverage masking (`samtools depth -aa -J -Q -q -G 0xF04`) with reference-coordinate `low_coverage_intervals`.
-- **Epidemiological Distance & Schema Provenance**: Whole-genome SNP distance matrices (`distance_matrices`, `snp_distance_matrices`, `compared_sites_matrices`) emitting `null` for zero-overlap pairs, full `run_config` + `software_versions` provenance, and formal validation against [`schema/viromics_run_report.schema.json`](schema/viromics_run_report.schema.json).
+- **Epidemiological Distance & Schema Provenance**: Whole-genome SNP distance matrices (`distance_matrices`, `snp_distance_matrices`, `compared_sites_matrices`) emitting `null` for zero-overlap pairs, full `run_config` + `software_versions` provenance, parameter validation against [`nextflow_schema.json`](nextflow_schema.json), and report validation against [`schema/viromics_run_report.schema.json`](schema/viromics_run_report.schema.json).
+- **Reproducible Packaging & Synthetic CI**: Pinned [`pipeline/environment.yml`](pipeline/environment.yml) (`-profile conda`), unified [`Dockerfile`](Dockerfile) (`-profile docker` / `-profile singularity`), and a deterministic synthetic E2E test suite (`pipeline/test_data/` + `verify_e2e.py`).
 
 ### React Web Dashboard
 - **Zero-Database, Schema-Driven Design**: Client-side application that dynamically consumes `viromics_run_report.json` (`v2.0.0` schema with `v1` fallback), adapting QC tiers, thresholds, run configuration, and software provenance automatically.
@@ -29,10 +30,14 @@ An integrated suite for genomic epidemiology of viral pathogens. It combines a m
 ## Project Structure
 
 - `pipeline/`: Modular Nextflow (DSL2) workflow script and processes.
-  - `main.nf`: Core workflow script orchestrating parameters and imports.
-  - `nextflow.config`: Parameter sets, resources, and conda environment profiles.
+  - `main.nf`: Core workflow script with parameter schema validation and samplesheet `platform` enforcement.
+  - `nextflow.config`: Parameter sets, process resource limits, and `conda`/`docker`/`singularity` profiles.
+  - `environment.yml`: Pinned Conda specification (`python=3.12`, `jsonschema`, `fastp`, `fastplong`, `bwa`, `minimap2`, `samtools`, `bcftools`, `htslib`).
   - `modules/`: Decoupled Nextflow process definitions.
   - `bin/parse_metrics.py`: Metric aggregator, variant translator, and distance matrix calculator.
+  - `test_data/`: Compact (`<100 KB`) deterministic Illumina + ONT synthetic fixture and `verify_e2e.py` biological assertion suite.
+- `Dockerfile`: Reproducible micromamba image built from `pipeline/environment.yml` for `-profile docker` and `-profile singularity`.
+- `nextflow_schema.json`: nf-core-compatible JSON Schema covering all pipeline parameters.
 - `wiki.html`: Standalone interactive technical documentation wiki and manual.
 - `dashboard/`: A client-side web application (React, Vite, Tailwind CSS).
 - `scripts/`: Development and testing tools.
@@ -106,8 +111,10 @@ nextflow run pipeline/main.nf \
 | `--min_iupac_freq` / `--max_iupac_freq` | `0.25` / `0.75` | Allele frequency band for IUPAC biallelic SNP coding |
 | `--qc_pass_depth` / `--qc_pass_breadth` / `--qc_pass_max_n` | `100` / `95.0` / `5.0` | Callable-target QC `PASS` thresholds (mean depth, breadth %, internal N %) |
 | `--qc_warn_depth` / `--qc_warn_breadth` / `--qc_warn_max_n` | `25` / `80.0` / `10.0` | Callable-target QC `WARN` thresholds (mean depth, breadth %, internal N %) |
+| `--container_image` | `'viromics:2.0.0'` | Container image tag or Singularity `.sif` path for `-profile docker` / `-profile singularity` |
+| `--max_cpus` / `--max_memory` / `--max_time` | `16` / `'32.GB'` / `'24.h'` | Maximum per-process resource ceilings enforced across all tasks |
 | `--outdir` | `./results` | Target directory to write execution results |
-| `-profile` | `standard` | Environment configuration profile (e.g., `-profile conda`) |
+| `-profile` | `standard` | Environment configuration profile (`conda`, `docker`, `singularity`, or `standard`) |
 
 ---
 
@@ -119,7 +126,9 @@ Ensure your reference FASTA contig header names exactly match the chromosome/seq
 - **Gene Annotation (GFF3)**: `annotations.gff3` containing `gene` or `CDS` features.
 - **Primer Schemes (BED)**: `primers.bed` (6-column format containing primer names with `_LEFT`/`_RIGHT` or `_F`/`_R` suffixes).
 
-### 2. Prepare Metadata CSV (Optional)
+### 2. Prepare Samplesheet & Metadata CSVs (Optional)
+If using `--sample_sheet` instead of `--reads`, supply `sample_id,platform,fastq_1[,fastq_2]`. When the `platform` column is present (`illumina` or `ont`), it is validated against `--platform` so mixed or conflicting samplesheets fail fast. Relative FASTQ paths resolve against either the current working directory or the samplesheet directory.
+
 To annotate samples inside the dashboard with host, collection date, or country data, create a comma-separated CSV with a mandatory `sample_id` column:
 ```csv
 sample_id,collection_date,location,host

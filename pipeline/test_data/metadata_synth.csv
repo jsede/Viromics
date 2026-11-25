@@ -1,0 +1,4 @@
+sample_id,collection_date,location,host
+SynthPos,2026-05-01,Melbourne,Human
+SynthDropout,2026-05-02,Sydney,Human
+SynthNTC,2026-05-01,Melbourne,Control

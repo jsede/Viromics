@@ -1,0 +1,4 @@
+sample_id,platform,fastq_1
+SynthPos,ont,pipeline/test_data/ont/SynthPos.fastq.gz
+SynthDropout,ont,pipeline/test_data/ont/SynthDropout.fastq.gz
+SynthNTC,ont,pipeline/test_data/ont/SynthNTC.fastq.gz

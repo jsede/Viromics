@@ -50,4 +50,4 @@ Before concluding any feature or bug fix:
    npm --prefix dashboard run test
    npm --prefix dashboard run build
    ```
-3. Verify that `wiki.html` contains up-to-date documentation and `schema/viromics_run_report.schema.json` validates report outputs.
+3. Verify that `wiki.html` contains up-to-date documentation, `nextflow_schema.json` matches `pipeline/nextflow.config`, `schema/viromics_run_report.schema.json` validates report outputs, and synthetic E2E verification (`pipeline/test_data/verify_e2e.py`) passes when workflow or metrics logic changes.

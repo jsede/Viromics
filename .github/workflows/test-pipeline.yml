@@ -2,39 +2,38 @@ name: Viromics Pipeline & Dashboard CI
 
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
   pull_request:
-    branches: [ master ]
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
-  test-pipeline:
-    name: Nextflow Pipeline Syntax & Compilation
+  python-tests:
+    name: Python Unit & Schema Tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          python-version: '3.12'
 
-      - name: Install Nextflow
+      - name: Install schema validator
+        run: python -m pip install --upgrade pip && pip install jsonschema==4.23.0
+
+      - name: Run Viromics Python verification suites
         run: |
-          curl -s https://get.nextflow.io | bash
-          chmod +x nextflow
-          sudo mv nextflow /usr/local/bin/
+          python pipeline/bin/test_prepare_consensus_vcf.py
+          python pipeline/bin/test_translation_phase.py
+          python pipeline/bin/regression_test_distance.py
+          python pipeline/bin/test_samtools_aa.py
+          python pipeline/bin/test_variant_qual_filter.py
+          python pipeline/bin/test_parse_metrics_m2.py
 
-      - name: Verify Nextflow version
-        run: nextflow -v
-
-      - name: Dry-run pipeline compiler check
-        run: |
-          nextflow run pipeline/main.nf --help
-
-  test-dashboard:
-    name: React Frontend Build
+  dashboard-ci:
+    name: Dashboard Lint, Test & Build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -49,8 +48,117 @@ jobs:
 
       - name: Install dependencies
         working-directory: dashboard
-        run: npm ci || npm install
+        run: npm ci
 
-      - name: Verify clean build compilation
+      - name: Lint React codebase
+        working-directory: dashboard
+        run: npm run lint
+
+      - name: Run Vitest suite
+        working-directory: dashboard
+        run: npm run test
+
+      - name: Build production bundle
         working-directory: dashboard
         run: npm run build
+
+  nextflow-e2e:
+    name: Nextflow Synthetic E2E (Illumina + ONT)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install Nextflow
+        run: |
+          curl -fsSL https://get.nextflow.io | bash
+          chmod +x nextflow
+          sudo mv nextflow /usr/local/bin/
+          nextflow -v
+
+      - name: Setup Conda environment from pipeline/environment.yml
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniforge-variant: Miniforge3
+          miniforge-version: latest
+          environment-file: pipeline/environment.yml
+          activate-environment: viromics
+          use-mamba: true
+
+      - name: CLI help & negative parameter/samplesheet validation checks
+        run: |
+          nextflow run pipeline/main.nf --help
+          if nextflow run pipeline/main.nf --min_cov 50; then
+            echo "ERROR: Expected unknown parameter --min_cov to fail fast"
+            exit 1
+          fi
+          if nextflow run pipeline/main.nf --platform illumina --sample_sheet pipeline/test_data/samplesheet_ont.csv --reference pipeline/test_data/ref_synth.fasta; then
+            echo "ERROR: Expected conflicting samplesheet platform to fail fast"
+            exit 1
+          fi
+
+      - name: Verify live bcftools filter unit test in conda env
+        run: python pipeline/bin/test_variant_qual_filter.py
+
+      - name: Run synthetic Illumina E2E + verify_e2e + -resume cache check
+        run: |
+          nextflow run pipeline/main.nf \
+            --platform illumina \
+            --sample_sheet pipeline/test_data/samplesheet_illumina.csv \
+            --reference pipeline/test_data/ref_synth.fasta \
+            --gff pipeline/test_data/ref_synth.gff3 \
+            --primer_bed pipeline/test_data/primers_synth.bed \
+            --metadata pipeline/test_data/metadata_synth.csv \
+            --run_id ci_synth_illumina \
+            --max_cpus 2 \
+            --max_memory 6.GB \
+            --outdir ci_results_illumina
+
+          python pipeline/test_data/verify_e2e.py \
+            --outdir ci_results_illumina \
+            --platform illumina \
+            --primer-bed pipeline/test_data/primers_synth.bed \
+            --require-jsonschema
+
+          nextflow run pipeline/main.nf \
+            --platform illumina \
+            --sample_sheet pipeline/test_data/samplesheet_illumina.csv \
+            --reference pipeline/test_data/ref_synth.fasta \
+            --gff pipeline/test_data/ref_synth.gff3 \
+            --primer_bed pipeline/test_data/primers_synth.bed \
+            --metadata pipeline/test_data/metadata_synth.csv \
+            --run_id ci_synth_illumina \
+            --max_cpus 2 \
+            --max_memory 6.GB \
+            --outdir ci_results_illumina \
+            -resume | tee resume_illumina.log
+          grep -Eq "cached:|Cached" resume_illumina.log
+
+      - name: Run synthetic ONT E2E + verify_e2e
+        run: |
+          nextflow run pipeline/main.nf \
+            --platform ont \
+            --sample_sheet pipeline/test_data/samplesheet_ont.csv \
+            --reference pipeline/test_data/ref_synth.fasta \
+            --gff pipeline/test_data/ref_synth.gff3 \
+            --primer_bed pipeline/test_data/primers_synth.bed \
+            --metadata pipeline/test_data/metadata_synth.csv \
+            --run_id ci_synth_ont \
+            --max_cpus 2 \
+            --max_memory 6.GB \
+            --outdir ci_results_ont
+
+          python pipeline/test_data/verify_e2e.py \
+            --outdir ci_results_ont \
+            --platform ont \
+            --primer-bed pipeline/test_data/primers_synth.bed \
+            --require-jsonschema

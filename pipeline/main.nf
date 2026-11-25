@@ -55,8 +55,116 @@ def helpMessage() {
       --qc_warn_depth       QC WARN min mean depth on callable target (default: 25)
       --qc_warn_breadth     QC WARN min callable breadth % at min_coverage (default: 80.0)
       --qc_warn_max_n       QC WARN max internal N % (default: 10.0)
+      --container_image     Container image tag or Singularity .sif path (default: 'viromics:2.0.0')
+      --max_cpus            Maximum CPUs permitted per process (default: 16)
+      --max_memory          Maximum memory permitted per process (default: '32.GB')
+      --max_time            Maximum wall-clock time permitted per process (default: '24.h')
       --outdir              Directory to write results to (default: './results')
     """
+}
+
+def validateParameters(Map allParams, File schemaFile) {
+    if (!schemaFile.exists()) {
+        error "Parameter schema file not found: ${schemaFile}"
+    }
+    def schema = new groovy.json.JsonSlurper().parse(schemaFile)
+    def schemaProps = [:]
+    if (schema.'$defs' instanceof Map) {
+        schema.'$defs'.each { _secName, secDef ->
+            if (secDef?.properties instanceof Map) {
+                schemaProps.putAll(secDef.properties)
+            }
+        }
+    }
+    if (schema.properties instanceof Map) {
+        schemaProps.putAll(schema.properties)
+    }
+
+    allParams.each { key, val ->
+        def kStr = key.toString()
+        if (!schemaProps.containsKey(kStr)) {
+            def exactPrefix = schemaProps.keySet().findAll { cand -> cand.toString().startsWith(kStr) }.sort()
+            def subMatch = schemaProps.keySet().findAll { cand -> cand.toString().contains(kStr) || kStr.contains(cand.toString()) }.sort()
+            def looseMatch = schemaProps.keySet().findAll { cand -> kStr.length() >= 4 && cand.toString().startsWith(kStr.take(4)) }.sort()
+            def suggestion = exactPrefix ?: (subMatch ?: looseMatch)
+            def hint = suggestion ? " Did you mean '--${suggestion[0]}'?" : ""
+            error "Parameter validation error: Unknown parameter '--${kStr}'.${hint} Run with --help or inspect nextflow_schema.json."
+        }
+
+        if (val == null || val == 'null' || (val instanceof String && val.trim() == '')) {
+            return
+        }
+
+        def prop = schemaProps[kStr]
+        def expectedType = prop?.type
+        if (expectedType == 'boolean') {
+            boolean ok = (val instanceof Boolean) || (val instanceof String && val.trim().toLowerCase() in ['true', 'false'])
+            if (!ok) {
+                error "Parameter validation error: '--${kStr}' expects a boolean (true/false), got '${val}'."
+            }
+        } else if (expectedType == 'integer') {
+            boolean ok = (val instanceof Integer || val instanceof Long) || (val instanceof String && (val.trim() ==~ /^-?\d+$/))
+            if (!ok) {
+                error "Parameter validation error: '--${kStr}' expects an integer value, got '${val}'."
+            }
+        } else if (expectedType == 'number') {
+            boolean ok = ((val instanceof Number) && !(val instanceof Boolean)) || (val instanceof String && val.trim().isDouble())
+            if (!ok) {
+                error "Parameter validation error: '--${kStr}' expects a numeric value, got '${val}'."
+            }
+        } else if (expectedType == 'string') {
+            if (val instanceof Boolean) {
+                error "Parameter validation error: '--${kStr}' expects a string value, got boolean '${val}' (did you omit the argument value?)."
+            }
+        }
+
+        if (prop?.'enum' instanceof List) {
+            def vStr = val.toString().trim()
+            if (!(vStr in prop.'enum'.collect { it.toString() })) {
+                error "Parameter validation error: '--${kStr}' value '${vStr}' must be one of ${prop.'enum'}."
+            }
+        }
+
+        if (expectedType in ['integer', 'number']) {
+            def numVal = new BigDecimal(val.toString().trim())
+            if (prop?.minimum != null && numVal < new BigDecimal(prop.minimum.toString())) {
+                error "Parameter validation error: '--${kStr}' (${numVal}) must be >= ${prop.minimum}."
+            }
+            if (prop?.maximum != null && numVal > new BigDecimal(prop.maximum.toString())) {
+                error "Parameter validation error: '--${kStr}' (${numVal}) must be <= ${prop.maximum}."
+            }
+        }
+    }
+}
+
+def resolveSamplePath(String rawPath, String sampleId, String colName, samplesheetParent) {
+    def direct = file(rawPath)
+    if (direct.exists()) return direct
+    if (!new File(rawPath).isAbsolute()) {
+        def rel = file("${samplesheetParent}/${rawPath}")
+        if (rel.exists()) return rel
+    }
+    error "Samplesheet Error: file not found for sample '${sampleId}' (${colName}): '${rawPath}'"
+}
+
+def validateSamplesheetRow(Map row, Set seenSampleIds, String expectedPlatform, String sheetPath) {
+    def sid = row.sample_id?.toString()?.trim()
+    if (!sid) {
+        error "Samplesheet Error: missing or empty 'sample_id' in row: ${row}"
+    }
+    if (!seenSampleIds.add(sid)) {
+        error "Samplesheet Error: duplicate sample_id '${sid}' in ${sheetPath}."
+    }
+    def rowPlatform = row.platform?.toString()?.trim()?.toLowerCase()
+    if (rowPlatform) {
+        if (!(rowPlatform in ['illumina', 'ont'])) {
+            error "Samplesheet Error: invalid platform '${rowPlatform}' for sample '${sid}'. Supported values are 'illumina' or 'ont'."
+        }
+        if (rowPlatform != expectedPlatform) {
+            error "Samplesheet Error: sample '${sid}' declares platform '${rowPlatform}' which conflicts with --platform '${expectedPlatform}'. Viromics processes one platform per run; split mixed-platform samplesheets or pass matching --platform."
+        }
+    }
+    return sid
 }
 
 /*
@@ -79,6 +187,9 @@ include { AGGREGATE_METRICS } from './modules/aggregate_metrics.nf'
 */
 
 workflow {
+    // Validate CLI & config parameters against nextflow_schema.json before executing any tasks
+    validateParameters(params, new File("${projectDir}/../nextflow_schema.json"))
+
     // Show help message if requested or if required params are missing (one of reads or sample_sheet is required)
     if (params.help || !params.platform || (!params.reads && !params.sample_sheet) || !params.reference) {
         helpMessage()
@@ -189,29 +300,36 @@ workflow {
     // Define input channels
     if (params.sample_sheet) {
         samplesheet_file = file(params.sample_sheet, checkIfExists: true)
-        
+        def samplesheetParent = samplesheet_file.toAbsolutePath().parent
+        def seenSampleIds = Collections.synchronizedSet([] as Set)
+
         if (params.platform == 'illumina') {
             reads_ch = Channel
                 .fromPath(samplesheet_file)
                 .splitCsv(header: true)
                 .map { row ->
-                    if (!row.sample_id || !row.fastq_1 || !row.fastq_2) {
-                        error "Samplesheet Error: row must contain 'sample_id', 'fastq_1', and 'fastq_2' for Illumina paired-end runs. Row: ${row}"
+                    def sid = validateSamplesheetRow(row, seenSampleIds, params.platform, params.sample_sheet)
+                    def r1 = row.fastq_1?.toString()?.trim()
+                    def r2 = row.fastq_2?.toString()?.trim()
+                    if (!r1 || !r2) {
+                        error "Samplesheet Error: row for '${sid}' must contain 'fastq_1' and 'fastq_2' for Illumina paired-end runs. Row: ${row}"
                     }
-                    def fq1 = file(row.fastq_1, checkIfExists: true)
-                    def fq2 = file(row.fastq_2, checkIfExists: true)
-                    return tuple(row.sample_id, [fq1, fq2])
+                    def fq1 = resolveSamplePath(r1, sid, 'fastq_1', samplesheetParent)
+                    def fq2 = resolveSamplePath(r2, sid, 'fastq_2', samplesheetParent)
+                    return tuple(sid, [fq1, fq2])
                 }
         } else {
             reads_ch = Channel
                 .fromPath(samplesheet_file)
                 .splitCsv(header: true)
                 .map { row ->
-                    if (!row.sample_id || !row.fastq_1) {
-                        error "Samplesheet Error: row must contain 'sample_id' and 'fastq_1' for ONT runs. Row: ${row}"
+                    def sid = validateSamplesheetRow(row, seenSampleIds, params.platform, params.sample_sheet)
+                    def r1 = row.fastq_1?.toString()?.trim()
+                    if (!r1) {
+                        error "Samplesheet Error: row for '${sid}' must contain 'fastq_1' for ONT runs. Row: ${row}"
                     }
-                    def fq1 = file(row.fastq_1, checkIfExists: true)
-                    return tuple(row.sample_id, fq1)
+                    def fq1 = resolveSamplePath(r1, sid, 'fastq_1', samplesheetParent)
+                    return tuple(sid, fq1)
                 }
         }
     } else {

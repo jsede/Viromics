@@ -1,0 +1,320 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/viromics/viromics/main/nextflow_schema.json",
+  "title": "Viromics pipeline parameters",
+  "description": "Amplicon-based viral whole-genome sequencing and genomic epidemiology pipeline.",
+  "type": "object",
+  "$defs": {
+    "input_output_options": {
+      "title": "Input/output options",
+      "type": "object",
+      "description": "Define where the pipeline should find input data and save output data.",
+      "properties": {
+        "run_id": {
+          "type": "string",
+          "description": "Deterministic run identifier recorded in report provenance (defaults to viromics_<sessionId>)."
+        },
+        "platform": {
+          "type": "string",
+          "default": "illumina",
+          "enum": ["illumina", "ont"],
+          "description": "Sequencing platform chemistry ('illumina' paired-end or 'ont' single-end long reads)."
+        },
+        "reads": {
+          "type": "string",
+          "description": "Glob pattern matching input FastQ files (alternative to --sample_sheet)."
+        },
+        "sample_sheet": {
+          "type": "string",
+          "format": "file-path",
+          "mimetype": "text/csv",
+          "description": "Path to CSV samplesheet with columns sample_id,platform,fastq_1[,fastq_2]."
+        },
+        "reference": {
+          "type": "string",
+          "format": "file-path",
+          "description": "Path to reference genome FASTA file (supports single or multi-FASTA panels)."
+        },
+        "gff": {
+          "type": "string",
+          "format": "file-path",
+          "description": "Optional path to GFF3 annotation file for CDS amino-acid consequence translation."
+        },
+        "primer_bed": {
+          "type": "string",
+          "format": "file-path",
+          "description": "Optional path to 6-column primer scheme BED file for strand-aware clipping and callable-target QC."
+        },
+        "amplicons_bed": {
+          "type": "string",
+          "format": "file-path",
+          "description": "Optional path to explicit amplicon insert coordinates BED file."
+        },
+        "metadata": {
+          "type": "string",
+          "format": "file-path",
+          "mimetype": "text/csv",
+          "description": "Optional path to CSV file binding epidemiological sample metadata by sample_id."
+        },
+        "cds_models": {
+          "type": "string",
+          "format": "file-path",
+          "default": "resources/annotation_models/cds_models.json",
+          "description": "Path to curated CDS ribosomal-slippage/translation exception models JSON."
+        },
+        "outdir": {
+          "type": "string",
+          "format": "directory-path",
+          "default": "./results",
+          "description": "Output directory where pipeline results and viromics_run_report.json will be saved."
+        }
+      }
+    },
+    "read_qc_options": {
+      "title": "Read QC options",
+      "type": "object",
+      "description": "Read trimming and filtering parameters for Illumina fastp and ONT fastplong.",
+      "properties": {
+        "ont_min_mean_qual": {
+          "type": "integer",
+          "default": 10,
+          "minimum": 0,
+          "description": "Minimum mean read Phred quality for ONT fastplong filtering (--mean_qual)."
+        },
+        "ont_min_length": {
+          "type": "integer",
+          "default": 100,
+          "minimum": 0,
+          "description": "Minimum ONT read length retained after trimming (fastplong --length_required)."
+        },
+        "ont_max_length": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "description": "Maximum ONT read length retained (0 = unlimited; fastplong --length_limit)."
+        },
+        "ont_trim_adapters": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable de novo fastplong ONT adapter auto-detection (disabled via -A by default to protect conserved amplicon ends)."
+        },
+        "ont_adapter_fasta": {
+          "type": "string",
+          "format": "file-path",
+          "description": "Optional FASTA file of custom ONT adapter sequences passed to fastplong (-a)."
+        },
+        "ont_adapter": {
+          "type": "string",
+          "description": "Optional single literal ONT adapter sequence for fastplong trimming."
+        }
+      }
+    },
+    "alignment_primer_options": {
+      "title": "Alignment & primer trimming options",
+      "type": "object",
+      "description": "Read alignment quality and amplicon primer clipping parameters.",
+      "properties": {
+        "min_map_qual": {
+          "type": "integer",
+          "default": 20,
+          "minimum": 0,
+          "description": "Minimum mapping quality (MAPQ) enforced across alignment filtering, depth masking, and variant calling."
+        },
+        "min_base_qual": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Minimum Phred base quality for depth masking and variant calling (auto-default: 20 Illumina, 15 ONT)."
+        },
+        "min_qual": {
+          "type": "integer",
+          "minimum": 0,
+          "hidden": true,
+          "description": "Deprecated alias for --min_base_qual (honored when explicitly set)."
+        },
+        "primer_tolerance": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Tolerance window in bp for samtools ampliconclip --tolerance (auto-default: 5 Illumina, 15 ONT)."
+        },
+        "min_clipped_len": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Minimum read length retained after QC and primer clipping (auto-default: 30 Illumina, 50 ONT)."
+        }
+      }
+    },
+    "variant_consensus_options": {
+      "title": "Variant calling & consensus options",
+      "type": "object",
+      "description": "Variant calling thresholds, pileup depth normalization, and haploid/IUPAC consensus gating.",
+      "properties": {
+        "ont_mpileup_config": {
+          "type": "string",
+          "default": "ont-sup",
+          "description": "bcftools mpileup -X profile for ONT reads (e.g. 'ont-sup', 'ont', or 'none')."
+        },
+        "min_coverage": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Minimum high-quality depth (FORMAT/DP) for variant calling and breadth calculations (auto-default: 10 Illumina, 50 ONT)."
+        },
+        "min_freq": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Minimum per-allele variant frequency (FORMAT/AD / FORMAT/DP) to report variants (auto-default: 0.2 Illumina, 0.5 ONT)."
+        },
+        "min_variant_qual": {
+          "type": "integer",
+          "default": 20,
+          "minimum": 0,
+          "description": "Minimum phred-scaled variant quality (VCF QUAL column)."
+        },
+        "disable_baq": {
+          "type": "boolean",
+          "default": true,
+          "description": "Pass -B (--no-BAQ) to bcftools mpileup to prevent depth loss on divergent viral genomes."
+        },
+        "max_mpileup_depth": {
+          "type": "integer",
+          "default": 100000,
+          "minimum": 0,
+          "description": "Maximum per-sample pileup depth cap; triggers deterministic strand-balanced downsampling when exceeded."
+        },
+        "downsample_seed": {
+          "type": "integer",
+          "default": 42,
+          "minimum": 0,
+          "description": "Fixed RNG seed for deterministic strand-balanced BAM downsampling."
+        },
+        "min_consensus_depth": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Minimum HQ depth required to call a consensus base; lower positions are masked as 'N' (defaults to --min_coverage)."
+        },
+        "min_consensus_freq": {
+          "type": "number",
+          "default": 0.5,
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Minimum allele frequency required for inclusion in haploid consensus (and major indels in IUPAC mode)."
+        },
+        "use_iupac": {
+          "type": "boolean",
+          "default": false,
+          "description": "Emit IUPAC ambiguity codes for biallelic SNPs within [min_iupac_freq, max_iupac_freq)."
+        },
+        "min_iupac_freq": {
+          "type": "number",
+          "default": 0.25,
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Lower allele frequency bound (inclusive) for biallelic SNP IUPAC ambiguity calling."
+        },
+        "max_iupac_freq": {
+          "type": "number",
+          "default": 0.75,
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Upper allele frequency bound (exclusive) for biallelic SNP IUPAC ambiguity calling."
+        }
+      }
+    },
+    "qc_tier_options": {
+      "title": "Sample QC tier options",
+      "type": "object",
+      "description": "Thresholds for PASS/WARN/FAIL classification evaluated on callable target (or whole contig when no BED is given).",
+      "properties": {
+        "qc_pass_depth": {
+          "type": "integer",
+          "default": 100,
+          "minimum": 0,
+          "description": "Minimum callable mean depth required for PASS status."
+        },
+        "qc_pass_breadth": {
+          "type": "number",
+          "default": 95.0,
+          "minimum": 0.0,
+          "maximum": 100.0,
+          "description": "Minimum callable breadth (%) at min_coverage required for PASS status."
+        },
+        "qc_pass_max_n": {
+          "type": "number",
+          "default": 5.0,
+          "minimum": 0.0,
+          "maximum": 100.0,
+          "description": "Maximum internal consensus N rate (%) permitted for PASS status."
+        },
+        "qc_warn_depth": {
+          "type": "integer",
+          "default": 25,
+          "minimum": 0,
+          "description": "Minimum callable mean depth required for WARN status (below fails)."
+        },
+        "qc_warn_breadth": {
+          "type": "number",
+          "default": 80.0,
+          "minimum": 0.0,
+          "maximum": 100.0,
+          "description": "Minimum callable breadth (%) at min_coverage required for WARN status (below fails)."
+        },
+        "qc_warn_max_n": {
+          "type": "number",
+          "default": 10.0,
+          "minimum": 0.0,
+          "maximum": 100.0,
+          "description": "Maximum internal consensus N rate (%) permitted for WARN status (above fails)."
+        }
+      }
+    },
+    "resource_container_options": {
+      "title": "Container & resource options",
+      "type": "object",
+      "description": "Container image override and maximum per-task resource ceilings.",
+      "properties": {
+        "container_image": {
+          "type": "string",
+          "default": "viromics:2.0.0",
+          "description": "Container image tag or Singularity .sif path used by -profile docker / -profile singularity."
+        },
+        "max_cpus": {
+          "type": "integer",
+          "default": 16,
+          "minimum": 1,
+          "description": "Maximum number of CPUs that can be requested by any single process."
+        },
+        "max_memory": {
+          "type": "string",
+          "default": "32.GB",
+          "description": "Maximum amount of memory that can be requested by any single process (e.g. '32.GB')."
+        },
+        "max_time": {
+          "type": "string",
+          "default": "24.h",
+          "description": "Maximum wall-clock duration that can be requested by any single process (e.g. '24.h')."
+        }
+      }
+    },
+    "generic_options": {
+      "title": "Generic options",
+      "type": "object",
+      "properties": {
+        "help": {
+          "type": "boolean",
+          "default": false,
+          "hidden": true,
+          "description": "Display pipeline usage help message and exit."
+        }
+      }
+    }
+  },
+  "allOf": [
+    { "$ref": "#/$defs/input_output_options" },
+    { "$ref": "#/$defs/read_qc_options" },
+    { "$ref": "#/$defs/alignment_primer_options" },
+    { "$ref": "#/$defs/variant_consensus_options" },
+    { "$ref": "#/$defs/qc_tier_options" },
+    { "$ref": "#/$defs/resource_container_options" },
+    { "$ref": "#/$defs/generic_options" }
+  ]
+}

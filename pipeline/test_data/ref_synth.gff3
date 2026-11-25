@@ -1,0 +1,4 @@
+##gff-version 3
+##sequence-region SYN_VIRUS_1 1 1430
+SYN_VIRUS_1	synthetic	gene	101	1390	.	+	.	ID=gene-ORF1;Name=ORF1;gene=ORF1
+SYN_VIRUS_1	synthetic	CDS	101	1390	.	+	0	ID=cds-ORF1;Parent=gene-ORF1;Name=ORF1;gene=ORF1;protein_id=YP_SYN001.1;product=synthetic polyprotein

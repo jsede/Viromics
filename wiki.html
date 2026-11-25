@@ -893,27 +893,28 @@
               </tr>
               <tr>
                 <td><strong>Python</strong></td>
-                <td>Python 3.9+</td>
-                <td>Python 3.11</td>
-                <td>Metric aggregation, curated model parsing, test suites</td>
+                <td>Python 3.10+</td>
+                <td>Python 3.12 + <code>jsonschema</code></td>
+                <td>Metric aggregation, curated model parsing, schema validation, test suites</td>
               </tr>
             </tbody>
           </table>
         </div>
 
-        <h3>1. Pipeline Environment Setup (Conda / Micromamba)</h3>
-        <p>The pipeline automatically activates required bioconda packages when executed with <code>-profile conda</code>. Alternatively, create an isolated environment with all command-line tools:</p>
+        <h3>1. Pipeline Environment &amp; Container Setup (Conda / Docker / Singularity)</h3>
+        <p>The pipeline automatically provisions pinned bioinformatics tools from <code>pipeline/environment.yml</code> when executed with <code>-profile conda</code>, or inside a reproducible micromamba image (<code>Dockerfile</code>) via <code>-profile docker</code> or <code>-profile singularity</code> (overridable via <code>--container_image</code>):</p>
 
         <div class="code-container">
           <div class="code-header">
             <span>BASH</span>
             <button class="copy-btn" onclick="copyCode(this)">Copy</button>
           </div>
-          <pre><code># Create conda environment with all underlying bioinformatics utilities
-conda create -n viromics -c conda-forge -c bioconda nextflow fastp fastplong bwa minimap2 "samtools>=1.20" "bcftools>=1.20" python
+          <pre><code># Option A: Create conda environment directly from pinned pipeline/environment.yml
+conda env create -f pipeline/environment.yml
+conda activate viromics
 
-# Activate environment
-conda activate viromics</code></pre>
+# Option B: Build reproducible container image for -profile docker / singularity
+docker build -t viromics:2.0.0 .</code></pre>
         </div>
 
         <h3>2. Dashboard Compilation</h3>
@@ -1148,6 +1149,18 @@ npm run dev
                 <td>Configurable QC <code>WARN</code> thresholds evaluated on the callable target (depth, breadth %, internal N %).</td>
               </tr>
               <tr>
+                <td><code>--container_image</code></td>
+                <td>String</td>
+                <td><code>'viromics:2.0.0'</code></td>
+                <td>Docker image tag or Singularity <code>.sif</code> path used with <code>-profile docker</code> or <code>-profile singularity</code>.</td>
+              </tr>
+              <tr>
+                <td><code>--max_cpus</code> / <code>--max_memory</code> / <code>--max_time</code></td>
+                <td>Int / String / String</td>
+                <td><code>16</code> / <code>'32.GB'</code> / <code>'24.h'</code></td>
+                <td>Maximum per-task resource ceilings enforced across all Nextflow processes (also validated against <code>nextflow_schema.json</code>).</td>
+              </tr>
+              <tr>
                 <td><code>--outdir</code></td>
                 <td>Path</td>
                 <td><code>./results</code></td>
@@ -1219,7 +1232,8 @@ npm run dev
         <h2>6. Samplesheets & Metadata Specification</h2>
 
         <h3>Samplesheet CSV Format (<code>--sample_sheet</code>)</h3>
-        <p>A samplesheet allows precise mapping of multiplexed sample barcodes, controls, and read pairs without relying on shell regex expansions.</p>
+        <p>A samplesheet allows precise mapping of multiplexed sample barcodes, controls, and read pairs without relying on shell regex expansions. Parameter inputs are also validated against <code>nextflow_schema.json</code> at startup to fail fast on flag typos or type mismatches.</p>
+        <p><strong>Platform Enforcement:</strong> Each row may include a <code>platform</code> column (<code>illumina</code> or <code>ont</code>); if populated, it must match the CLI <code>--platform</code> value (mixed-platform samplesheets fail fast rather than silently ignoring row values). Duplicate <code>sample_id</code> rows are rejected, and relative FASTQ paths resolve cleanly against either the working directory or the samplesheet directory.</p>
 
         <div class="tab-group">
           <div class="tab-buttons">
