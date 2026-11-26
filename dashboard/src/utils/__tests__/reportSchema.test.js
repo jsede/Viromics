@@ -3,7 +3,9 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   computeStableReportId,
+  deduplicateConsequences,
   formatConsequences,
+  formatDepth,
   formatMetric,
   getBestReference,
   getMappedReads,
@@ -189,5 +191,21 @@ describe('reportSchema v2 validation & v1 fallback', () => {
     const mockPath = path.resolve(process.cwd(), 'public/mock_run_report.json');
     const mockData = JSON.parse(fs.readFileSync(mockPath, 'utf-8'));
     expect(() => validateUploadJSON(mockData)).not.toThrow();
+  });
+
+  it('deduplicates overlapping identical protein consequences and formats depths uniformly', () => {
+    const dedup = deduplicateConsequences([
+      { gene: 'ORF1ab', product: 'ORF1ab polyprotein', effect: 'missense', status: null, label: 'p.K47R', kind: 'missense' },
+      { gene: 'ORF1a', product: 'ORF1a polyprotein', effect: 'missense', status: null, label: 'p.K47R', kind: 'missense' },
+      { gene: 'ORF1ab', product: 'ORF1ab polyprotein', effect: 'unknown', status: 'unsupported_programmed_frameshift', label: 'AA unavailable', kind: 'unavailable' },
+    ]);
+    expect(dedup).toHaveLength(2);
+    expect(dedup[0].gene).toBe('ORF1ab/ORF1a');
+    expect(dedup[0].label).toBe('p.K47R');
+    expect(dedup[1].kind).toBe('unavailable');
+
+    expect(formatDepth(884.18)).toBe('884.2x');
+    expect(formatDepth(950.5)).toBe('950.5x');
+    expect(formatDepth(null)).toBe('N/A');
   });
 });

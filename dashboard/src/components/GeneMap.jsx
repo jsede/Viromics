@@ -1,15 +1,16 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { HelpCircle, Info, Download } from 'lucide-react';
-import { formatConsequences } from '../utils/reportSchema';
+import { Info, Download } from 'lucide-react';
+import { deduplicateConsequences, formatConsequences } from '../utils/reportSchema';
 import { serializeSvgElement, triggerBrowserDownload } from '../utils/exporters';
+import { getVariantConsequenceStyle } from '../utils/chartUtils';
 
 const FEATURE_PALETTE = [
-  { fill: '#DC2626', stroke: '#B91C1C', badge: 'bg-red-100 text-red-700' },
-  { fill: '#4F46E5', stroke: '#4338CA', badge: 'bg-indigo-100 text-indigo-700' },
-  { fill: '#059669', stroke: '#047857', badge: 'bg-emerald-100 text-emerald-700' },
-  { fill: '#7C3AED', stroke: '#6D28D9', badge: 'bg-violet-100 text-violet-700' },
-  { fill: '#D97706', stroke: '#B45309', badge: 'bg-amber-100 text-amber-700' },
-  { fill: '#0284C7', stroke: '#0369A1', badge: 'bg-sky-100 text-sky-700' },
+  { fill: '#33658A', stroke: '#244A66', badge: 'bg-[#EAF3F5] text-[#0B4654] border-[#B9D6DD]' },
+  { fill: '#4A9386', stroke: '#356E64', badge: 'bg-[#ECF7F2] text-[#16654A] border-[#B5DFCE]' },
+  { fill: '#B38B3A', stroke: '#8A6929', badge: 'bg-[#FDF6E7] text-[#8C5308] border-[#EBD29B]' },
+  { fill: '#8B5E83', stroke: '#674360', badge: 'bg-[#F1F3F5] text-[#111827] border-[#CBD2D9]' },
+  { fill: '#6B8E5B', stroke: '#4D6940', badge: 'bg-[#ECF7F2] text-[#16654A] border-[#B5DFCE]' },
+  { fill: '#B86B52', stroke: '#8D4E39', badge: 'bg-[#FCEEEB] text-[#A62C22] border-[#EBBDB8]' },
 ];
 
 function getFeatureDisplayName(gene) {
@@ -25,9 +26,7 @@ function packFeatureTracks(genes) {
   // Group multi-part CDS (e.g. ORF1ab) so exon segments share the same visual track & connector
   const groupsMap = new Map();
   genes.forEach((g, idx) => {
-    const key = g.grouping_key
-      ? `${g.strand || '+'}::${g.grouping_key}`
-      : `single_${idx}`;
+    const key = g.grouping_key ? `${g.strand || '+'}::${g.grouping_key}` : `single_${idx}`;
     if (!groupsMap.has(key)) {
       groupsMap.set(key, {
         key,
@@ -75,21 +74,22 @@ export default function GeneMap({ genes, variants, refLength, sampleId = 'sample
 
   if (!genes || genes.length === 0) {
     return (
-      <div className="p-6 glass-panel rounded-2xl text-center text-slate-500">
-        <Info className="w-6 h-6 mx-auto mb-2 text-red-600" />
+      <div className="p-6 glass-panel text-center text-[#6B7280] text-[13px]">
+        <Info className="w-5 h-5 mx-auto mb-2 text-[#0F5C6E]" />
         <p>No annotation (GFF3) file loaded. Custom genome browser disabled.</p>
       </div>
     );
   }
 
-  const safeRefLength = refLength && refLength > 0
-    ? refLength
-    : Math.max(...genes.map((g) => g.end), 1);
+  const safeRefLength = refLength && refLength > 0 ? refLength : Math.max(...genes.map((g) => g.end), 1);
 
+  const leftPad = 36;
+  const rightPad = 36;
+  const plotWidth = 1000 - leftPad - rightPad; // 928
   const trackHeight = 30;
   const topPad = 24;
   const axisY = topPad + numTracks * trackHeight + 16;
-  const svgHeight = axisY + 65;
+  const svgHeight = axisY + 66;
 
   const handleExportSvg = () => {
     if (!svgRef.current) return;
@@ -98,34 +98,78 @@ export default function GeneMap({ genes, variants, refLength, sampleId = 'sample
   };
 
   return (
-    <div className="p-6 glass-panel rounded-2xl flex flex-col gap-5">
+    <div className="p-5 glass-panel flex flex-col gap-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h3 className="text-lg font-semibold text-slate-900">Genome Feature Browser</h3>
-          <p className="text-xs text-slate-500">
-            Non-overlapping staggered track view of GFF3 CDS/gene features with mapped variant positions
+          <h3 className="text-[16px] font-semibold text-[#111827]">Genome Feature Browser</h3>
+          <p className="text-[12px] text-[#6B7280] mt-0.5">
+            Staggered GFF3 CDS/gene tracks with consequence-encoded variant lollipops
           </p>
         </div>
-        <button
-          onClick={handleExportSvg}
-          className="self-start sm:self-auto flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 text-slate-700 text-xs font-semibold rounded-lg hover:bg-slate-50 transition-colors"
-        >
-          <Download className="w-3.5 h-3.5 text-red-600" />
-          Export SVG
-        </button>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3 text-[11px] text-[#4B5563]">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#B43B2E]" />
+              Missense / Nonsense
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#CC8400]" />
+              Indel / Frameshift
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#5C6773]" />
+              Synonymous
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#6B7280]" />
+              Non-coding
+            </span>
+          </div>
+
+          <button
+            onClick={handleExportSvg}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#CBD2D9] text-[#111827] text-xs font-semibold rounded-[4px] hover:border-[#0F5C6E] hover:text-[#0F5C6E] transition-colors whitespace-nowrap"
+          >
+            <Download className="w-3.5 h-3.5 text-[#0F5C6E]" />
+            Export SVG
+          </button>
+        </div>
       </div>
 
-      <div className="relative w-full overflow-x-auto py-2 select-none">
-        <svg ref={svgRef} viewBox={`0 0 1000 ${svgHeight}`} width="100%" className="min-w-[800px]">
-          <line x1="20" y1={axisY} x2="980" y2={axisY} stroke="#CBD5E1" strokeWidth="5" strokeLinecap="round" />
+      <div className="relative w-full overflow-x-auto py-1 select-none">
+        <svg
+          ref={svgRef}
+          viewBox={`0 0 1000 ${svgHeight}`}
+          width="100%"
+          className="min-w-[780px]"
+          style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}
+        >
+          <line
+            x1={leftPad}
+            y1={axisY}
+            x2={leftPad + plotWidth}
+            y2={axisY}
+            stroke="#CBD2D9"
+            strokeWidth="4"
+            strokeLinecap="round"
+          />
 
           {[0, 0.25, 0.5, 0.75, 1].map((pct, i) => {
             const pos = Math.round(pct * safeRefLength);
-            const x = 20 + pct * 960;
+            const x = leftPad + pct * plotWidth;
+            const textAnchor = i === 0 ? 'start' : i === 4 ? 'end' : 'middle';
             return (
               <g key={i}>
-                <line x1={x} y1={axisY} x2={x} y2={axisY + 6} stroke="#94A3B8" strokeWidth="1.5" />
-                <text x={x} y={axisY + 52} fill="#64748B" fontSize="9.5" textAnchor="middle" fontFamily="Fira Code, monospace">
+                <line x1={x} y1={axisY} x2={x} y2={axisY + 6} stroke="#6B7280" strokeWidth="1.25" />
+                <text
+                  x={x}
+                  y={axisY + 52}
+                  fill="#4B5563"
+                  fontSize="10"
+                  textAnchor={textAnchor}
+                  fontFamily="Arial, Helvetica, sans-serif"
+                >
                   {pos.toLocaleString()} bp
                 </text>
               </g>
@@ -136,13 +180,16 @@ export default function GeneMap({ genes, variants, refLength, sampleId = 'sample
             const y = topPad + grp.track * trackHeight;
             const h = 13;
             const isHovered = hoveredGroup && hoveredGroup.key === grp.key;
-            const spanX = 20 + (grp.minStart / safeRefLength) * 960;
-            const spanW = Math.max(8, ((grp.maxEnd - grp.minStart) / safeRefLength) * 960);
+            const spanX = leftPad + (grp.minStart / safeRefLength) * plotWidth;
+            const spanW = Math.max(8, ((grp.maxEnd - grp.minStart) / safeRefLength) * plotWidth);
 
             return (
               <g
                 key={grp.key}
-                onMouseEnter={() => setHoveredGroup(grp)}
+                onMouseEnter={() => {
+                  setHoveredVariant(null);
+                  setHoveredGroup(grp);
+                }}
                 onMouseLeave={() => setHoveredGroup(null)}
                 className="cursor-pointer"
               >
@@ -158,8 +205,8 @@ export default function GeneMap({ genes, variants, refLength, sampleId = 'sample
                   />
                 )}
                 {grp.parts.map((part, pIdx) => {
-                  const x = 20 + (part.start / safeRefLength) * 960;
-                  const width = Math.max(6, ((part.end - part.start) / safeRefLength) * 960);
+                  const x = leftPad + (part.start / safeRefLength) * plotWidth;
+                  const width = Math.max(6, ((part.end - part.start) / safeRefLength) * plotWidth);
                   return (
                     <rect
                       key={`${grp.key}-p-${pIdx}`}
@@ -169,10 +216,10 @@ export default function GeneMap({ genes, variants, refLength, sampleId = 'sample
                       height={h}
                       rx="3"
                       fill={grp.color.fill}
-                      fillOpacity={isHovered ? 0.85 : 0.4}
+                      fillOpacity={isHovered ? 0.85 : 0.42}
                       stroke={grp.color.stroke}
-                      strokeOpacity={isHovered ? 1 : 0.75}
-                      strokeWidth="1.5"
+                      strokeOpacity={isHovered ? 1 : 0.8}
+                      strokeWidth="1.25"
                       className="gene-block"
                     />
                   );
@@ -181,8 +228,8 @@ export default function GeneMap({ genes, variants, refLength, sampleId = 'sample
                   <text
                     x={spanX + spanW / 2}
                     y={y - 5}
-                    fill={isHovered ? '#DC2626' : '#334155'}
-                    fontSize="9.5"
+                    fill={isHovered ? '#0F5C6E' : '#111827'}
+                    fontSize="10"
                     fontWeight={isHovered ? '700' : '600'}
                     textAnchor="middle"
                   >
@@ -195,12 +242,16 @@ export default function GeneMap({ genes, variants, refLength, sampleId = 'sample
 
           {variants &&
             variants.map((v, idx) => {
-              const x = 20 + (v.position / safeRefLength) * 960;
+              const x = leftPad + (v.position / safeRefLength) * plotWidth;
               const isHovered = hoveredVariant && hoveredVariant.position === v.position && hoveredVariant.alt === v.alt;
+              const { color } = getVariantConsequenceStyle(v);
               return (
                 <g
                   key={idx}
-                  onMouseEnter={() => setHoveredVariant(v)}
+                  onMouseEnter={() => {
+                    setHoveredGroup(null);
+                    setHoveredVariant(v);
+                  }}
                   onMouseLeave={() => setHoveredVariant(null)}
                   className="cursor-pointer"
                 >
@@ -208,15 +259,17 @@ export default function GeneMap({ genes, variants, refLength, sampleId = 'sample
                     x1={x}
                     y1={axisY}
                     x2={x}
-                    y2={axisY + 28}
-                    stroke={isHovered ? '#DC2626' : '#64748B'}
-                    strokeWidth={isHovered ? 2.5 : 1.5}
+                    y2={axisY + 26}
+                    stroke={isHovered ? '#0F5C6E' : color}
+                    strokeWidth={isHovered ? 2.25 : 1.5}
                   />
                   <circle
                     cx={x}
-                    cy={axisY + 28}
-                    r={isHovered ? 5.5 : 3.5}
-                    fill={isHovered ? '#DC2626' : '#64748B'}
+                    cy={axisY + 26}
+                    r={isHovered ? 5 : 3.5}
+                    fill={color}
+                    stroke={isHovered ? '#0F5C6E' : '#FFFFFF'}
+                    strokeWidth={isHovered ? 2 : 0.75}
                   />
                 </g>
               );
@@ -224,80 +277,66 @@ export default function GeneMap({ genes, variants, refLength, sampleId = 'sample
         </svg>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl min-h-24">
-          {hoveredGroup ? (
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center gap-2">
-                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${hoveredGroup.color.badge}`}>
-                  CDS ({hoveredGroup.parts.length} {hoveredGroup.parts.length === 1 ? 'interval' : 'intervals'})
+      <div className="px-3.5 py-2.5 bg-[#F8F9FA] border border-[#E2E6EA] rounded-[4px] min-h-[44px] flex flex-wrap items-center justify-between gap-2 text-xs">
+        {hoveredVariant ? (
+          <>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <span className="px-2 py-0.5 rounded-[4px] text-[10px] font-semibold bg-[#EAF3F5] text-[#0B4654] border border-[#B9D6DD]">
+                VARIANT
+              </span>
+              <span className="font-mono font-semibold text-[#111827]">
+                g.{hoveredVariant.position}{hoveredVariant.ref}&gt;{hoveredVariant.alt}
+              </span>
+              <span className="text-[#4B5563]">
+                Gene: <strong className="text-[#111827]">{hoveredVariant.gene}</strong>
+              </span>
+              <span className="text-[#4B5563] font-mono tabular-nums">
+                AF: <strong className="text-[#0F5C6E]">{(hoveredVariant.frequency * 100).toFixed(1)}%</strong> · Depth:{' '}
+                <strong className="text-[#111827]">{hoveredVariant.depth}x</strong>
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {deduplicateConsequences(formatConsequences(hoveredVariant)).map((c, idx) => (
+                <span
+                  key={idx}
+                  title={c.tooltip}
+                  className={`text-[10px] px-2 py-0.5 rounded-[4px] border font-mono ${
+                    c.kind === 'unavailable'
+                      ? 'bg-[#F1F3F5] text-[#6B7280] border-[#E2E6EA] italic'
+                      : c.kind === 'synonymous'
+                      ? 'bg-[#F1F3F5] text-[#4B5563] border-[#E2E6EA]'
+                      : c.kind === 'frameshift' || c.kind === 'indel'
+                      ? 'bg-[#FDF6E7] text-[#9A5B06] border-[#EBD29B] font-semibold'
+                      : 'bg-[#FCEEEB] text-[#B43B2E] border-[#EBBDB8] font-semibold'
+                  }`}
+                >
+                  {c.gene}: {c.label}
                 </span>
-                <h4 className="text-sm font-bold text-slate-900">{hoveredGroup.label}</h4>
-              </div>
-              <p className="text-xs text-slate-700 font-medium">
-                {hoveredGroup.product || 'No product annotation available'}
-              </p>
-              <div className="flex flex-wrap items-center gap-4 text-[10px] font-mono text-slate-500 mt-0.5">
-                <span>Span: {hoveredGroup.minStart.toLocaleString()}–{hoveredGroup.maxEnd.toLocaleString()} bp</span>
-                <span>Strand: ({hoveredGroup.strand})</span>
-                {hoveredGroup.protein_id && <span>Protein: {hoveredGroup.protein_id}</span>}
-              </div>
+              ))}
             </div>
-          ) : (
-            <div className="flex items-center gap-2 text-slate-500 text-xs h-full py-4 justify-center">
-              <HelpCircle className="w-4 h-4 text-indigo-600" />
-              <span>Hover over a feature block to inspect CDS intervals and product details</span>
+          </>
+        ) : hoveredGroup ? (
+          <>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <span className={`px-2 py-0.5 rounded-[4px] border text-[10px] font-semibold ${hoveredGroup.color.badge}`}>
+                CDS ({hoveredGroup.parts.length} {hoveredGroup.parts.length === 1 ? 'interval' : 'intervals'})
+              </span>
+              <strong className="text-[#111827] font-semibold">{hoveredGroup.label}</strong>
+              <span className="text-[#4B5563]">{hoveredGroup.product || 'No product annotation available'}</span>
             </div>
-          )}
-        </div>
-
-        <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl min-h-24">
-          {hoveredVariant ? (
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700">
-                  VARIANT
-                </span>
-                <h4 className="text-sm font-bold text-slate-900 font-mono">
-                  g.{hoveredVariant.position}{hoveredVariant.ref}&gt;{hoveredVariant.alt}
-                </h4>
-              </div>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs mt-0.5">
-                <span className="text-slate-500">Gene Region: <strong className="text-slate-900">{hoveredVariant.gene}</strong></span>
-                <span className="text-slate-500">Class: <strong className="text-slate-900">{hoveredVariant.type}</strong></span>
-                <span className="text-slate-500">Allele Freq: <strong className="text-red-600 font-mono">{(hoveredVariant.frequency * 100).toFixed(1)}%</strong></span>
-                <span className="text-slate-500">Depth: <strong className="text-slate-900 font-mono">{hoveredVariant.depth}x</strong></span>
-              </div>
-              {(() => {
-                const cons = formatConsequences(hoveredVariant);
-                if (cons.length === 0) return null;
-                return (
-                  <div className="flex flex-wrap gap-1.5 mt-1">
-                    {cons.map((c, idx) => (
-                      <span
-                        key={idx}
-                        className={`text-[10px] px-2 py-0.5 rounded border font-mono ${
-                          c.kind === 'unavailable' || c.kind === 'synonymous'
-                            ? 'bg-slate-100 text-slate-500 border-slate-200'
-                            : c.kind === 'frameshift' || c.kind === 'indel'
-                            ? 'bg-amber-50 text-amber-700 border-amber-200 font-semibold'
-                            : 'bg-indigo-50 text-indigo-700 border-indigo-200 font-bold'
-                        }`}
-                      >
-                        {c.gene}: {c.label}
-                      </span>
-                    ))}
-                  </div>
-                );
-              })()}
+            <div className="flex flex-wrap items-center gap-3 text-[11px] font-mono text-[#6B7280] tabular-nums">
+              <span>
+                Span: {hoveredGroup.minStart.toLocaleString()}–{hoveredGroup.maxEnd.toLocaleString()} bp
+              </span>
+              <span>Strand: ({hoveredGroup.strand})</span>
+              {hoveredGroup.protein_id && <span>Protein: {hoveredGroup.protein_id}</span>}
             </div>
-          ) : (
-            <div className="flex items-center gap-2 text-slate-500 text-xs h-full py-4 justify-center">
-              <HelpCircle className="w-4 h-4 text-red-600" />
-              <span>Hover over a variant marker pin to inspect structured consequences</span>
-            </div>
-          )}
-        </div>
+          </>
+        ) : (
+          <span className="text-[#6B7280]">
+            Hover over a CDS track block or variant lollipop marker above to inspect coordinates, product annotation, and protein consequences.
+          </span>
+        )}
       </div>
     </div>
   );

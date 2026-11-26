@@ -121,8 +121,8 @@ export default function PhylogeneticTree({
 
   if (!samples || samples.length < 2) {
     return (
-      <div className="p-8 text-center text-slate-500 glass-panel rounded-2xl flex flex-col items-center gap-3">
-        <AlertCircle className="w-8 h-8 text-amber-500" />
+      <div className="p-8 text-center text-[#6B7280] glass-panel flex flex-col items-center gap-3 text-[13px]">
+        <AlertCircle className="w-6 h-6 text-[#8C5308]" />
         <p>Phylogenetic clustering requires at least 2 samples in the run.</p>
       </div>
     );
@@ -152,39 +152,41 @@ export default function PhylogeneticTree({
     triggerBrowserDownload(fasta, `viromics_${selectedRefName || 'cohort'}_consensus.fasta`, 'text/plain;charset=utf-8;');
   };
 
+  const totalExcluded = excludedLowBreadth.length + excludedOverlap.length;
+
   return (
-    <div className="p-6 glass-panel rounded-2xl flex flex-col gap-6">
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+    <div className="p-5 glass-panel flex flex-col gap-4">
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
         <div>
-          <h3 className="text-lg font-semibold text-slate-900">
+          <h3 className="text-[16px] font-semibold text-[#111827]">
             Phylogenetic Tree ({algorithm === 'NJ' ? 'Midpoint-Rooted Neighbor-Joining' : 'Rooted UPGMA'})
           </h3>
-          <p className="text-xs text-slate-500">
-            Built from coordinate-aligned, deletion-masked SNP divergence with zero-overlap guards and exact compared-site tracking
+          <p className="text-[12px] text-[#6B7280] mt-0.5">
+            Coordinate-aligned, deletion-masked SNP divergence with zero-overlap guards and exact compared-site tracking
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
-          <div className="flex bg-slate-100 border border-slate-200 rounded-lg p-0.5 text-xs">
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <div className="flex bg-[#F1F3F5] border border-[#E2E6EA] rounded-[4px] p-0.5 text-xs">
             <button
               onClick={() => setAlgorithm('NJ')}
-              className={`px-3 py-1 rounded-md font-medium transition-colors ${
-                algorithm === 'NJ' ? 'bg-red-600 text-white font-semibold' : 'text-slate-600 hover:text-slate-900'
+              className={`px-2.5 py-1 rounded-[3px] font-medium transition-colors whitespace-nowrap ${
+                algorithm === 'NJ' ? 'bg-[#0F5C6E] text-white font-semibold' : 'text-[#4B5563] hover:text-[#111827]'
               }`}
             >
               Neighbor-Joining (Midpoint)
             </button>
             <button
               onClick={() => setAlgorithm('UPGMA')}
-              className={`px-3 py-1 rounded-md font-medium transition-colors ${
-                algorithm === 'UPGMA' ? 'bg-red-600 text-white font-semibold' : 'text-slate-600 hover:text-slate-900'
+              className={`px-2.5 py-1 rounded-[3px] font-medium transition-colors whitespace-nowrap ${
+                algorithm === 'UPGMA' ? 'bg-[#0F5C6E] text-white font-semibold' : 'text-[#4B5563] hover:text-[#111827]'
               }`}
             >
               UPGMA
             </button>
           </div>
 
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 text-xs text-slate-700">
+          <div className="flex items-center gap-1.5 bg-white border border-[#CBD2D9] rounded-[4px] px-2.5 py-1 text-xs text-[#4B5563]">
             <span>Min Breadth %:</span>
             <input
               type="number"
@@ -193,11 +195,11 @@ export default function PhylogeneticTree({
               step={5}
               value={minBreadth}
               onChange={(e) => setMinBreadth(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
-              className="w-12 bg-white border border-slate-300 rounded px-1 py-0.5 text-xs font-mono text-slate-900"
+              className="w-12 bg-[#F8F9FA] border border-[#CBD2D9] rounded-[3px] px-1 py-0.5 text-xs font-mono text-[#111827] tabular-nums"
             />
           </div>
 
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 text-xs text-slate-700">
+          <div className="flex items-center gap-1.5 bg-white border border-[#CBD2D9] rounded-[4px] px-2.5 py-1 text-xs text-[#4B5563]">
             <span>Min Sites:</span>
             <input
               type="number"
@@ -205,7 +207,7 @@ export default function PhylogeneticTree({
               step={50}
               value={minComparedSites}
               onChange={(e) => setMinComparedSites(Math.max(1, Number(e.target.value) || 1))}
-              className="w-16 bg-white border border-slate-300 rounded px-1 py-0.5 text-xs font-mono text-slate-900"
+              className="w-16 bg-[#F8F9FA] border border-[#CBD2D9] rounded-[3px] px-1 py-0.5 text-xs font-mono text-[#111827] tabular-nums"
             />
           </div>
 
@@ -213,7 +215,7 @@ export default function PhylogeneticTree({
             <select
               value={selectedRefName}
               onChange={(e) => setSelectedRefName(e.target.value)}
-              className="bg-slate-50 border border-slate-200 text-slate-900 text-xs rounded-xl px-3 py-1.5 focus:outline-none cursor-pointer"
+              className="bg-white border border-[#CBD2D9] text-[#111827] text-xs font-mono rounded-[4px] px-2.5 py-1.5 focus:outline-none focus:border-[#0F5C6E] cursor-pointer"
             >
               {refs.map((r) => (
                 <option key={r.name} value={r.name}>
@@ -225,45 +227,43 @@ export default function PhylogeneticTree({
         </div>
       </div>
 
-      <div className="bg-indigo-50/70 border border-indigo-200 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <Info className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
-          <div>
-            <span className="text-xs font-semibold text-indigo-900 block">
-              Quality &amp; Overlap Safe-Guard (&ge;{minBreadth}% breadth, &ge;{minComparedSites.toLocaleString()} comparable sites)
-            </span>
-            <span className="text-[11px] text-slate-600 block mt-0.5 leading-relaxed">
-              Excludes samples below {minBreadth}% breadth or with <code>null</code> / insufficient mutual coverage to prevent topological distortion. Negative NJ branch lengths are clamped to 0.
-            </span>
-          </div>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-b border-[#E2E6EA] py-2.5">
+        <div className="flex items-center gap-3 text-xs text-[#4B5563] tabular-nums">
+          <span>
+            Included: <strong className="font-mono text-[#111827]">{includedSamples.length}</strong>
+          </span>
+          <span className="text-[#CBD2D9]">·</span>
+          <span>
+            Excluded: <strong className="font-mono text-[#111827]">{totalExcluded}</strong>
+          </span>
         </div>
 
         {treeData && (
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={handleDownloadNewick}
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-white border border-slate-300 text-slate-700 text-[11px] font-semibold rounded-lg hover:bg-slate-50"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-[#CBD2D9] text-[#111827] text-xs font-semibold rounded-[4px] hover:border-[#0F5C6E] hover:text-[#0F5C6E] transition-colors"
             >
-              <Download className="w-3.5 h-3.5 text-red-600" />
+              <Download className="w-3.5 h-3.5 text-[#0F5C6E]" />
               Newick (.nwk)
             </button>
             <button
               onClick={handleDownloadMatrixCsv}
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-white border border-slate-300 text-slate-700 text-[11px] font-semibold rounded-lg hover:bg-slate-50"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-[#CBD2D9] text-[#111827] text-xs font-semibold rounded-[4px] hover:border-[#0F5C6E] hover:text-[#0F5C6E] transition-colors"
             >
-              <Download className="w-3.5 h-3.5 text-red-600" />
+              <Download className="w-3.5 h-3.5 text-[#0F5C6E]" />
               Matrix (.csv)
             </button>
             <button
               onClick={handleDownloadSvg}
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-white border border-slate-300 text-slate-700 text-[11px] font-semibold rounded-lg hover:bg-slate-50"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-[#CBD2D9] text-[#111827] text-xs font-semibold rounded-[4px] hover:border-[#0F5C6E] hover:text-[#0F5C6E] transition-colors"
             >
-              <Download className="w-3.5 h-3.5 text-red-600" />
+              <Download className="w-3.5 h-3.5 text-[#0F5C6E]" />
               SVG
             </button>
             <button
               onClick={handleDownloadCohortFasta}
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-red-600 text-white text-[11px] font-semibold rounded-lg hover:bg-red-700"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0F5C6E] hover:bg-[#0B4654] text-white text-xs font-semibold rounded-[4px] transition-colors"
             >
               <Download className="w-3.5 h-3.5" />
               Cohort FASTA
@@ -272,18 +272,26 @@ export default function PhylogeneticTree({
         )}
       </div>
 
+      <div className="bg-[#F8F9FA] border border-[#E2E6EA] rounded-[4px] px-3.5 py-2 flex items-center gap-2.5 text-xs text-[#4B5563]">
+        <Info className="w-4 h-4 text-[#0F5C6E] shrink-0" />
+        <span>
+          <strong className="text-[#111827]">Quality &amp; Overlap Safe-Guard (&ge;{minBreadth}% breadth, &ge;{minComparedSites.toLocaleString()} comparable sites):</strong>{' '}
+          Excludes samples with insufficient mutual coverage or <code className="font-mono text-[#0B4654]">null</code> distance; negative NJ branch lengths are clamped to 0.
+        </span>
+      </div>
+
       {includedSamples.length < 2 ? (
-        <div className="p-8 text-center text-slate-500 border border-slate-200 rounded-xl bg-slate-50 flex flex-col items-center gap-2">
-          <AlertCircle className="w-8 h-8 text-amber-500" />
-          <p className="font-semibold text-slate-900">Insufficient Comparable Samples</p>
-          <p className="text-xs text-slate-600">
+        <div className="p-8 text-center text-[#6B7280] border border-[#E2E6EA] rounded-[6px] bg-[#F8F9FA] flex flex-col items-center gap-2">
+          <AlertCircle className="w-6 h-6 text-[#8C5308]" />
+          <p className="font-semibold text-[#111827]">Insufficient Comparable Samples</p>
+          <p className="text-xs text-[#4B5563]">
             Tree reconstruction requires at least 2 mutually overlapping samples with &ge;{minBreadth}% coverage breadth for{' '}
-            <span className="font-mono text-red-600 font-semibold">{selectedRefName}</span> ({includedSamples.length} qualified).
+            <span className="font-mono text-[#0F5C6E] font-semibold">{selectedRefName}</span> ({includedSamples.length} qualified).
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <div className="lg:col-span-3 border border-slate-200 rounded-xl bg-white p-4 overflow-x-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-5">
+          <div className="lg:col-span-3 border border-[#E2E6EA] rounded-[6px] bg-white p-4 overflow-x-auto">
             {treeData && (
               <svg
                 ref={svgRef}
@@ -305,15 +313,15 @@ export default function PhylogeneticTree({
                         y1={16}
                         x2={x}
                         y2={layout.svgHeight - 28}
-                        stroke="#E2E8F0"
+                        stroke="#E5E7EB"
                         strokeWidth="1"
                         strokeDasharray="3 3"
                       />
                       <text
                         x={x}
                         y={layout.svgHeight - 10}
-                        fill="#64748B"
-                        fontSize="9.5"
+                        fill="#6B7280"
+                        fontSize="10"
                         textAnchor="middle"
                       >
                         {scaleVal.toFixed(3)}%
@@ -327,8 +335,8 @@ export default function PhylogeneticTree({
                     key={edge.key}
                     d={edge.d}
                     fill="none"
-                    stroke="#475569"
-                    strokeWidth="2"
+                    stroke="#2D3742"
+                    strokeWidth="1.5"
                     strokeLinecap="round"
                   />
                 ))}
@@ -346,15 +354,15 @@ export default function PhylogeneticTree({
                       <circle
                         cx={c.x}
                         cy={c.y}
-                        r={isLeaf ? 4.5 : 3.5}
-                        fill={isHovered ? '#DC2626' : isLeaf ? '#0F766E' : '#4F46E5'}
+                        r={isLeaf ? 4 : 3}
+                        fill={isHovered ? '#B43B2E' : isLeaf ? '#0F5C6E' : '#6B7280'}
                       />
 
                       {isLeaf ? (
                         <text
                           x={c.x + 10}
                           y={c.y + 4}
-                          fill={isHovered ? '#DC2626' : '#0F172A'}
+                          fill={isHovered ? '#B43B2E' : '#111827'}
                           fontSize="11.5"
                           fontWeight={isHovered ? '700' : '600'}
                           textAnchor="start"
@@ -368,15 +376,17 @@ export default function PhylogeneticTree({
                               x={c.x - 52}
                               y={c.y - 24}
                               width="104"
-                              height="16"
+                              height="17"
                               rx="4"
-                              fill="#0F172A"
+                              fill="#FFFFFF"
+                              stroke="#CBD2D9"
+                              strokeWidth="1"
                             />
                             <text
                               x={c.x}
-                              y={c.y - 13}
-                              fill="#FFFFFF"
-                              fontSize="8.5"
+                              y={c.y - 12.5}
+                              fill="#111827"
+                              fontSize="9"
                               fontWeight="600"
                               textAnchor="middle"
                             >
@@ -393,13 +403,13 @@ export default function PhylogeneticTree({
           </div>
 
           <div className="flex flex-col gap-4">
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
-              <div className="flex items-center gap-2 text-red-600 mb-2">
+            <div className="p-4 bg-[#F8F9FA] border border-[#E2E6EA] rounded-[6px]">
+              <div className="flex items-center gap-2 text-[#0F5C6E] mb-1.5">
                 <GitBranch className="w-4 h-4" />
-                <h4 className="text-xs font-bold tracking-wider uppercase">Nearest Relatives</h4>
+                <h4 className="text-[11px] font-semibold tracking-[0.06em] uppercase">Nearest Relatives</h4>
               </div>
-              <p className="text-[11px] text-slate-600 leading-relaxed">
-                Pairwise SNP divergence, raw SNP differences, and mutually covered comparable sites:
+              <p className="text-[11px] text-[#6B7280] leading-relaxed">
+                Pairwise SNP divergence, raw SNPs, and mutually covered comparable sites:
               </p>
 
               <div className="mt-3 flex flex-col gap-2.5 max-h-72 overflow-y-auto pr-1">
@@ -416,21 +426,21 @@ export default function PhylogeneticTree({
                   const sitesVal = matchIdx >= 0 ? sitesMatrix?.[idx]?.[matchIdx] : null;
 
                   return (
-                    <div key={s.sample_id} className="flex flex-col border-b border-slate-200 pb-2 last:border-none">
-                      <span className="text-[11px] font-semibold text-slate-900 truncate">{s.sample_id}</span>
+                    <div key={s.sample_id} className="flex flex-col border-b border-[#E2E6EA] pb-2 last:border-none">
+                      <span className="text-[12px] font-semibold text-[#111827] truncate">{s.sample_id}</span>
                       {matchIdx >= 0 ? (
-                        <div className="text-[10px] text-slate-600 mt-0.5 space-y-0.5">
+                        <div className="text-[11px] text-[#4B5563] mt-0.5 space-y-0.5 tabular-nums">
                           <div>
-                            Nearest: <strong className="text-red-600">{includedSamples[matchIdx].sample_id}</strong>
+                            Nearest: <strong className="text-[#0F5C6E] font-semibold">{includedSamples[matchIdx].sample_id}</strong>
                           </div>
-                          <div className="font-mono text-slate-700">
+                          <div className="font-mono text-[#4B5563]">
                             {(minVal * 100).toFixed(3)}% div
                             {snpVal !== null && snpVal !== undefined ? ` · ${snpVal} SNP${snpVal === 1 ? '' : 's'}` : ''}
                             {sitesVal !== null && sitesVal !== undefined ? ` · ${sitesVal.toLocaleString()} bp` : ''}
                           </div>
                         </div>
                       ) : (
-                        <span className="text-[10px] text-slate-400 mt-0.5">No comparable relative</span>
+                        <span className="text-[11px] text-[#6B7280] mt-0.5">No comparable relative</span>
                       )}
                     </div>
                   );
@@ -442,19 +452,19 @@ export default function PhylogeneticTree({
       )}
 
       {(excludedLowBreadth.length > 0 || excludedOverlap.length > 0) && (
-        <div className="border border-slate-200 bg-slate-50 rounded-xl p-4 flex flex-col gap-2">
-          <span className="text-xs font-semibold text-red-700 tracking-wider block">
+        <div className="border border-[#E2E6EA] bg-[#F8F9FA] rounded-[4px] px-4 py-3 flex flex-col gap-1.5">
+          <span className="text-xs font-semibold text-[#A62C22]">
             Excluded Samples (Low Breadth &lt;{minBreadth}% at &ge;{minCoverageThreshold}x or Insufficient Overlap)
           </span>
-          <div className="flex flex-wrap gap-2 mt-1">
+          <div className="flex flex-wrap gap-2">
             {excludedLowBreadth.map(({ sample, breadth }) => (
-              <span key={`lb-${sample.sample_id}`} className="text-[11px] bg-white border border-slate-200 text-slate-700 font-mono px-2.5 py-1 rounded-lg">
-                {sample.sample_id}: <strong className="text-red-600">{breadth.toFixed(1)}% cov</strong>
+              <span key={`lb-${sample.sample_id}`} className="text-[11px] bg-white border border-[#E2E6EA] text-[#111827] font-mono px-2.5 py-1 rounded-[4px] tabular-nums">
+                {sample.sample_id}: <strong className="text-[#A62C22]">{breadth.toFixed(1)}% cov</strong>
               </span>
             ))}
             {excludedOverlap.map(({ sample, breadth }) => (
-              <span key={`ov-${sample.sample_id}`} className="text-[11px] bg-white border border-amber-200 text-slate-700 font-mono px-2.5 py-1 rounded-lg">
-                {sample.sample_id}: <strong className="text-amber-600">{breadth.toFixed(1)}% cov (insufficient site overlap)</strong>
+              <span key={`ov-${sample.sample_id}`} className="text-[11px] bg-white border border-[#EBD29B] text-[#111827] font-mono px-2.5 py-1 rounded-[4px] tabular-nums">
+                {sample.sample_id}: <strong className="text-[#8C5308]">{breadth.toFixed(1)}% cov (insufficient site overlap)</strong>
               </span>
             ))}
           </div>

@@ -1,24 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Dna,
   UploadCloud,
   Grid,
   Sliders,
-  Activity,
-  BarChart3,
   GitBranch,
   AlertTriangle,
   CheckCircle2,
   XCircle,
   FileText,
   Layers,
-  ShieldCheck,
-  Zap,
   Printer,
   ArrowUpDown,
   Download,
 } from 'lucide-react';
-import confetti from 'canvas-confetti';
 
 import CoverageChart from './components/CoverageChart';
 import AmpliconChart from './components/AmpliconChart';
@@ -30,7 +24,9 @@ import ErrorBoundary from './components/ErrorBoundary';
 
 import {
   computeStableReportId,
+  deduplicateConsequences,
   formatConsequences,
+  formatDepth,
   formatMetric,
   getBestReference,
   getCoDetections,
@@ -55,51 +51,73 @@ import {
   triggerBrowserDownload,
 } from './utils/exporters';
 
-function StatusBadge({ status, reasons, basis, depth, wholeBreadth, evalBreadth, evalNRate, thresholds }) {
-  const pillStyle =
-    status === 'PASS'
-      ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
-      : status === 'WARN'
-      ? 'text-amber-700 bg-amber-50 border-amber-200'
-      : 'text-red-700 bg-red-50 border-red-200';
+function ViromicsLogoMark() {
+  return (
+    <div className="w-8 h-8 rounded-[4px] bg-[#EAF3F5] border border-[#B9D6DD] flex items-center justify-center shrink-0">
+      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" aria-hidden="true">
+        <path
+          d="M5 7L12 18L19 7"
+          stroke="#0F5C6E"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <circle cx="12" cy="6.5" r="1.75" fill="#0F5C6E" />
+      </svg>
+    </div>
+  );
+}
 
+function getQcBadgeClasses(status) {
+  if (status === 'PASS') return 'text-[#16654A] bg-[#ECF7F2] border-[#B5DFCE]';
+  if (status === 'WARN') return 'text-[#8C5308] bg-[#FDF6E7] border-[#EBD29B]';
+  return 'text-[#A62C22] bg-[#FCEEEB] border-[#EBBDB8]';
+}
+
+function getQcIconColor(status) {
+  if (status === 'PASS') return 'text-[#16654A]';
+  if (status === 'WARN') return 'text-[#8C5308]';
+  return 'text-[#A62C22]';
+}
+
+function StatusBadge({ status, reasons, basis, depth, wholeBreadth, evalBreadth, evalNRate, thresholds }) {
+  const pillStyle = getQcBadgeClasses(status);
   const IconComp = status === 'PASS' ? CheckCircle2 : status === 'WARN' ? AlertTriangle : XCircle;
-  const iconColor =
-    status === 'PASS' ? 'text-emerald-400' : status === 'WARN' ? 'text-amber-400' : 'text-red-400';
+  const iconColor = getQcIconColor(status);
 
   return (
-    <span className={`relative group cursor-help inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full border select-none ${pillStyle}`}>
+    <span className={`relative group cursor-help inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-[4px] border select-none tabular-nums ${pillStyle}`}>
       <IconComp className="w-3 h-3" /> {status}
       <div
-        className="absolute right-full top-1/2 -translate-y-1/2 mr-3 hidden group-hover:block z-50 w-64 p-3 bg-slate-900 border border-slate-700 text-slate-200 rounded-xl shadow-2xl text-left font-normal leading-relaxed select-text"
+        className="absolute right-full top-1/2 -translate-y-1/2 mr-2 hidden group-hover:block z-50 w-64 p-3 bg-white border border-[#CBD2D9] text-[#111827] rounded-[6px] shadow-tooltip text-left font-normal leading-relaxed select-text"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="font-bold text-white mb-2 text-xs tracking-wider flex items-center justify-between gap-2 border-b border-slate-800 pb-1.5">
+        <div className="font-semibold text-[#111827] mb-2 text-xs flex items-center justify-between gap-2 border-b border-[#E2E6EA] pb-1.5">
           <span className="flex items-center gap-1.5">
-            <IconComp className={`w-4 h-4 ${iconColor}`} />
+            <IconComp className={`w-3.5 h-3.5 ${iconColor}`} />
             {status}
           </span>
-          <span className="text-[9px] font-mono text-slate-400">{basis || 'whole_contig'}</span>
+          <span className="text-[10px] font-mono text-[#6B7280]">{basis || 'whole_contig'}</span>
         </div>
-        <div className="text-[10px] space-y-1">
-          <p className="text-slate-300">
-            Depth: <strong className="text-white">{depth.toLocaleString()}x</strong> · Callable Breadth:{' '}
-            <strong className="text-white">{evalBreadth.toFixed(1)}%</strong>
+        <div className="text-[11px] space-y-1 text-[#4B5563]">
+          <p>
+            Depth: <strong className="text-[#111827] font-mono">{formatDepth(depth)}</strong> · Callable Breadth:{' '}
+            <strong className="text-[#111827] font-mono">{evalBreadth.toFixed(1)}%</strong>
             {basis !== 'whole_contig' && (
-              <span className="text-slate-400"> (whole: {wholeBreadth.toFixed(1)}%)</span>
+              <span className="text-[#6B7280]"> (whole: {wholeBreadth.toFixed(1)}%)</span>
             )}{' '}
-            · Internal N: <strong className="text-white">{evalNRate.toFixed(1)}%</strong>
+            · Internal N: <strong className="text-[#111827] font-mono">{evalNRate.toFixed(1)}%</strong>
           </p>
           {reasons && reasons.length > 0 && (
-            <ul className="list-disc pl-4 space-y-0.5 text-slate-300 pt-1">
+            <ul className="list-disc pl-4 space-y-0.5 text-[#4B5563] pt-1">
               {reasons.map((r, i) => (
-                <li key={i} className="font-mono text-[9.5px]">
+                <li key={i} className="font-mono text-[10px]">
                   {r}
                 </li>
               ))}
             </ul>
           )}
-          <p className="text-[9px] text-slate-400 pt-1 border-t border-slate-800">
+          <p className="text-[10px] text-[#6B7280] pt-1.5 border-t border-[#E2E6EA] font-mono">
             PASS: &ge;{thresholds.pass_depth}x, &ge;{thresholds.pass_breadth}%, &le;{thresholds.pass_max_n}% N
           </p>
         </div>
@@ -139,15 +157,6 @@ export default function App() {
       });
   }, []);
 
-  const celebrateSuccess = () => {
-    confetti({
-      particleCount: 80,
-      spread: 60,
-      origin: { y: 0.8 },
-      colors: ['#DC2626', '#7C3AED', '#10B981'],
-    });
-  };
-
   const handleJSONData = (text) => {
     try {
       const data = JSON.parse(text);
@@ -162,7 +171,6 @@ export default function App() {
       }
       setUploadError('');
       setActiveTab('overview');
-      celebrateSuccess();
     } catch (err) {
       setUploadError(`Failed to load JSON: ${err.message}`);
     }
@@ -205,11 +213,11 @@ export default function App() {
 
   if (!reportData) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-slate-50">
-        <div className="w-full max-w-lg p-8 glass-panel rounded-3xl flex flex-col gap-6 text-center animate-pulse">
-          <Dna className="w-16 h-16 mx-auto text-red-600 animate-bounce" />
-          <h2 className="text-2xl font-bold text-slate-900">Loading Viromics Suite...</h2>
-          <p className="text-xs text-slate-500">Initializing analytical frameworks and visuals.</p>
+      <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-[#F8F9FA]">
+        <div className="w-full max-w-md p-8 glass-panel flex flex-col items-center gap-3 text-center">
+          <ViromicsLogoMark />
+          <h2 className="text-[18px] font-semibold text-[#111827]">Loading Viromics Suite</h2>
+          <p className="text-[13px] text-[#6B7280]">Initializing cohort coverage, variants, and phylogenetics.</p>
         </div>
       </div>
     );
@@ -289,36 +297,37 @@ export default function App() {
   const passPct = reportData.samples.length > 0 ? Math.round((passingSamplesCount / reportData.samples.length) * 100) : 0;
 
   const platformLabel = runConfig.platform ? String(runConfig.platform).toUpperCase() : 'UNKNOWN';
-  const versionBadges = Object.entries(softwareVersions).slice(0, 4);
+  const versionEntries = Object.entries(softwareVersions);
 
   return (
-    <div className="min-h-screen pb-16 flex flex-col bg-slate-50">
+    <div className="min-h-screen pb-14 flex flex-col bg-[#F8F9FA]">
       <header className="no-print app-header sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-red-600 to-violet-600 flex items-center justify-center">
-              <Dna className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-base font-bold text-white tracking-wide flex items-center gap-1.5">
-                VIROMICS
-                <span className="text-[10px] py-0.5 px-1.5 rounded bg-red-600/20 text-red-400 font-semibold font-mono">
+            <ViromicsLogoMark />
+            <div className="flex flex-col">
+              <div className="flex items-center gap-2">
+                <h1 className="text-[15px] font-bold text-[#111827] tracking-tight leading-none">
+                  VIROMICS
+                </h1>
+                <span className="text-[10px] py-0.5 px-1.5 rounded-[4px] bg-[#EAF3F5] text-[#0B4654] border border-[#B9D6DD] font-semibold font-mono leading-none">
                   v{reportData.schema_version || '1.0'}
                 </span>
-              </h1>
-              <p className="text-[10px] text-slate-400">Genomic Epidemiology Suite</p>
+              </div>
+              <p className="text-[11px] text-[#6B7280] leading-tight mt-0.5">
+                Genomic Epidemiology Suite
+              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="hidden md:flex items-center gap-2 bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-xl text-xs">
-              <Zap className="w-3.5 h-3.5 text-amber-400" />
-              <span className="text-slate-400">Active Run:</span>
-              <strong className="text-white font-mono">{reportData.run_id}</strong>
+          <div className="flex items-center gap-2.5">
+            <div className="hidden md:flex items-center gap-2 bg-[#F8F9FA] border border-[#E2E6EA] px-2.5 py-1.5 rounded-[4px] text-xs">
+              <span className="text-[#6B7280]">Run:</span>
+              <strong className="text-[#111827] font-mono font-semibold">{reportData.run_id}</strong>
             </div>
 
-            <label className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 border border-slate-700 text-xs text-slate-100 font-semibold rounded-xl hover:bg-slate-700 cursor-pointer transition-all">
-              <UploadCloud className="w-4 h-4 text-red-400" />
+            <label className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0F5C6E] hover:bg-[#0B4654] text-xs text-white font-semibold rounded-[4px] cursor-pointer transition-colors">
+              <UploadCloud className="w-3.5 h-3.5" />
               Upload Run JSON
               <input type="file" accept=".json,application/json" onChange={handleFileUpload} className="hidden" />
             </label>
@@ -326,28 +335,28 @@ export default function App() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 w-full flex-1 flex flex-col gap-6 mt-8">
+      <main className="max-w-7xl mx-auto px-6 w-full flex-1 flex flex-col gap-5 mt-6">
         {isDragging ? (
           <div
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-            className="border-2 border-dashed border-red-500 bg-red-50 rounded-3xl p-16 flex flex-col items-center justify-center text-center gap-4"
+            className="border-2 border-dashed border-[#0F5C6E] bg-[#EAF3F5] rounded-[6px] p-16 flex flex-col items-center justify-center text-center gap-3"
           >
-            <UploadCloud className="w-16 h-16 text-red-600 animate-bounce" />
-            <h2 className="text-xl font-bold text-slate-900">Drop the report JSON file here</h2>
-            <p className="text-sm text-slate-500">Instantly populate coverage, mutations, amplicons, and phylogeny.</p>
+            <UploadCloud className="w-10 h-10 text-[#0F5C6E]" />
+            <h2 className="text-[18px] font-semibold text-[#111827]">Drop the report JSON file here</h2>
+            <p className="text-[13px] text-[#4B5563]">Populate cohort coverage, mutations, amplicons, and phylogeny.</p>
           </div>
         ) : (
-          <div onDragOver={handleDragOver} className="flex flex-col gap-6">
+          <div onDragOver={handleDragOver} className="flex flex-col gap-5">
             {uploadError && (
-              <div className="bg-red-50 border border-red-200 text-red-700 text-xs p-3 rounded-xl flex items-center gap-2">
+              <div className="bg-[#FCEEEB] border border-[#EBBDB8] text-[#A62C22] text-xs px-3.5 py-2.5 rounded-[4px] flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 shrink-0" />
                 <span>{uploadError}</span>
               </div>
             )}
 
-            <div className="flex flex-wrap border-b border-slate-200 gap-1 sm:gap-2 no-print">
+            <nav className="flex flex-wrap border-b border-[#E2E6EA] gap-1 no-print" aria-label="Dashboard sections">
               {[
                 { id: 'overview', label: 'Run Overview', icon: Grid },
                 { id: 'details', label: 'Sample Details', icon: Sliders },
@@ -361,88 +370,110 @@ export default function App() {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-t-xl transition-all border-b-2 ${
+                    className={`flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-semibold transition-colors border-b-2 -mb-px ${
                       isActive
-                        ? 'border-red-600 text-red-600 bg-red-50/70'
-                        : 'border-transparent text-slate-600 hover:text-slate-900'
+                        ? 'border-[#0F5C6E] text-[#0F5C6E]'
+                        : 'border-transparent text-[#4B5563] hover:text-[#111827]'
                     }`}
                   >
-                    <TabIcon className="w-4 h-4" />
+                    <TabIcon className="w-3.5 h-3.5" />
                     {tab.label}
                   </button>
                 );
               })}
-            </div>
+            </nav>
 
             {activeTab === 'overview' && (
               <ErrorBoundary componentName="Run Overview">
-                <div className="flex flex-col gap-6">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="p-5 glass-panel rounded-2xl flex items-center justify-between">
-                      <div>
-                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Total Samples</span>
-                        <h3 className="text-2xl font-bold text-slate-900 mt-1">{reportData.samples.length}</h3>
-                        <span className="text-[10px] text-slate-500 mt-1 block">Sequencing cohort size</span>
+                <div className="flex flex-col gap-4">
+                  <div className="glass-panel grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-[#E2E6EA]">
+                    <div className="px-5 py-4 flex flex-col justify-between">
+                      <span className="text-[11px] text-[#6B7280] font-semibold uppercase tracking-[0.06em]">
+                        Total Samples
+                      </span>
+                      <div className="text-[22px] font-semibold text-[#111827] font-mono tabular-nums mt-1 leading-tight">
+                        {reportData.samples.length}
                       </div>
-                      <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center">
-                        <BarChart3 className="w-5 h-5 text-red-600" />
-                      </div>
+                      <span className="text-[12px] text-[#6B7280] mt-1">Sequencing cohort size</span>
                     </div>
 
-                    <div className="p-5 glass-panel rounded-2xl flex items-center justify-between">
-                      <div>
-                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Quality Pass Rate</span>
-                        <h3 className="text-2xl font-bold text-emerald-600 mt-1">{passPct}%</h3>
-                        <span className="text-[10px] text-slate-500 mt-1 block">
-                          {passingSamplesCount} PASS, {warnSamplesCount} WARN, {failSamplesCount} FAIL
-                        </span>
+                    <div className="px-5 py-4 flex flex-col justify-between">
+                      <span className="text-[11px] text-[#6B7280] font-semibold uppercase tracking-[0.06em]">
+                        Quality Pass Rate
+                      </span>
+                      <div
+                        className={`text-[22px] font-semibold font-mono tabular-nums mt-1 leading-tight ${
+                          passPct === 100
+                            ? 'text-[#16654A]'
+                            : failSamplesCount > 0
+                            ? 'text-[#111827]'
+                            : 'text-[#8C5308]'
+                        }`}
+                      >
+                        {passPct}%
                       </div>
-                      <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
-                        <ShieldCheck className="w-5 h-5 text-emerald-600" />
-                      </div>
+                      <span className="text-[12px] text-[#4B5563] mt-1 tabular-nums">
+                        <strong className="text-[#16654A] font-semibold">{passingSamplesCount} PASS</strong>
+                        {' · '}
+                        <strong className="text-[#8C5308] font-semibold">{warnSamplesCount} WARN</strong>
+                        {' · '}
+                        <strong className="text-[#A62C22] font-semibold">{failSamplesCount} FAIL</strong>
+                      </span>
                     </div>
 
-                    <div className="p-5 glass-panel rounded-2xl flex items-center justify-between">
-                      <div>
-                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Reference Target</span>
-                        <h3 className="text-sm font-bold text-slate-900 mt-1 font-mono truncate max-w-[165px]">
-                          {refsList.length === 1
-                            ? refsList[0].name
-                            : refsList.length > 1
-                            ? `${refsList.length} Reference Strains`
-                            : 'Unknown'}
-                        </h3>
-                        <span className="text-[10px] text-slate-500 mt-1.5 block">
-                          Length: {refsList.reduce((acc, r) => acc + (r.length || 0), 0).toLocaleString()} bp
-                        </span>
+                    <div className="px-5 py-4 flex flex-col justify-between min-w-0">
+                      <span className="text-[11px] text-[#6B7280] font-semibold uppercase tracking-[0.06em]">
+                        Reference Target
+                      </span>
+                      <div
+                        className="text-[13px] font-semibold text-[#111827] mt-1.5 font-mono truncate"
+                        title={refsList.map((r) => r.name).join(', ')}
+                      >
+                        {refsList.length === 1
+                          ? refsList[0].name
+                          : refsList.length > 1
+                          ? `${refsList.length} Reference Strains`
+                          : 'Unknown'}
                       </div>
-                      <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center">
-                        <Dna className="w-5 h-5 text-indigo-600" />
-                      </div>
+                      <span className="text-[12px] text-[#6B7280] mt-1 font-mono tabular-nums">
+                        Length: {refsList.reduce((acc, r) => acc + (r.length || 0), 0).toLocaleString()} bp
+                      </span>
                     </div>
 
-                    <div className="p-5 glass-panel rounded-2xl flex items-center justify-between">
-                      <div className="min-w-0">
-                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Run Configuration</span>
-                        <h3 className="text-sm font-bold text-red-600 mt-1 font-mono">
-                          {platformLabel} · &ge;{minCovThreshold}x · AF&ge;{runConfig.min_freq !== undefined ? `${(runConfig.min_freq * 100).toFixed(0)}%` : 'N/A'}
-                        </h3>
-                        <span className="text-[10px] text-slate-500 mt-1 block truncate">
-                          {runConfig.use_iupac ? 'IUPAC Consensus' : `Haploid (AF>=${((runConfig.min_consensus_freq ?? 0.5) * 100).toFixed(0)}%)`}
-                          {versionBadges.length > 0 ? ` · ${versionBadges.map(([k, v]) => `${k} ${v}`).join(', ')}` : ''}
-                        </span>
+                    <div className="px-5 py-4 flex flex-col justify-between min-w-0">
+                      <span className="text-[11px] text-[#6B7280] font-semibold uppercase tracking-[0.06em]">
+                        Run Configuration
+                      </span>
+                      <div className="text-[13px] font-semibold text-[#0F5C6E] mt-1.5 font-mono tabular-nums">
+                        {platformLabel} · &ge;{minCovThreshold}x · AF&ge;
+                        {runConfig.min_freq !== undefined ? `${(runConfig.min_freq * 100).toFixed(0)}%` : 'N/A'}
                       </div>
-                      <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
-                        <Activity className="w-5 h-5 text-red-600" />
-                      </div>
+                      <span className="text-[12px] text-[#6B7280] mt-1 font-mono tabular-nums">
+                        {runConfig.use_iupac
+                          ? 'IUPAC Consensus'
+                          : `Haploid (AF>=${((runConfig.min_consensus_freq ?? 0.5) * 100).toFixed(0)}%)`}
+                      </span>
                     </div>
                   </div>
 
-                  <div className="p-6 glass-panel rounded-2xl flex flex-col gap-4">
+                  {versionEntries.length > 0 && (
+                    <div className="px-4 py-2 bg-[#F1F3F5] border border-[#E2E6EA] rounded-[6px] flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] font-mono text-[#4B5563]">
+                      <span className="font-sans font-semibold uppercase tracking-[0.06em] text-[10px] text-[#6B7280]">
+                        Pipeline Versions
+                      </span>
+                      {versionEntries.map(([tool, ver]) => (
+                        <span key={tool} className="whitespace-nowrap">
+                          <strong className="text-[#111827] font-semibold">{tool}</strong> {ver}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="p-5 glass-panel flex flex-col gap-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div>
-                        <h3 className="text-lg font-semibold text-slate-900">Consensus Summary &amp; QC</h3>
-                        <p className="text-xs text-slate-500">
+                        <h3 className="text-[16px] font-semibold text-[#111827]">Consensus Summary &amp; QC</h3>
+                        <p className="text-[12px] text-[#6B7280] mt-0.5">
                           Tier classifications evaluated dynamically from pipeline thresholds and callable-target intervals
                         </p>
                       </div>
@@ -450,64 +481,81 @@ export default function App() {
                       {reportData.samples.length > 0 && (
                         <button
                           onClick={handleDownloadCohortFasta}
-                          className="self-start sm:self-auto flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 text-slate-700 text-xs font-semibold rounded-xl hover:bg-slate-50 transition-colors"
+                          className="self-start sm:self-auto flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#CBD2D9] text-[#111827] text-xs font-semibold rounded-[4px] hover:border-[#0F5C6E] hover:text-[#0F5C6E] transition-colors whitespace-nowrap"
                         >
-                          <Download className="w-3.5 h-3.5 text-red-600" />
+                          <Download className="w-3.5 h-3.5 text-[#0F5C6E]" />
                           Download Cohort FASTA
                         </button>
                       )}
                     </div>
 
-                    <div className="flex flex-wrap gap-x-6 gap-y-1.5 text-[11px] text-slate-600 border-t border-slate-200 pt-2.5">
+                    <div className="flex flex-wrap gap-x-6 gap-y-1.5 text-[12px] text-[#4B5563] border-t border-[#E2E6EA] pt-2.5 tabular-nums">
                       <span className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                        <strong className="text-slate-900">PASS:</strong> &ge;{qcThresholds.pass_depth}x depth, &ge;{qcThresholds.pass_breadth}% breadth, &le;{qcThresholds.pass_max_n}% internal N
+                        <span className="w-2 h-2 rounded-full bg-[#2A8C6A]" />
+                        <strong className="text-[#16654A]">PASS:</strong> &ge;{qcThresholds.pass_depth}x depth, &ge;{qcThresholds.pass_breadth}% breadth, &le;{qcThresholds.pass_max_n}% internal N
                       </span>
                       <span className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-amber-500" />
-                        <strong className="text-slate-900">WARN:</strong> &ge;{qcThresholds.warn_depth}x depth, &ge;{qcThresholds.warn_breadth}% breadth, &le;{qcThresholds.warn_max_n}% internal N
+                        <span className="w-2 h-2 rounded-full bg-[#CC8400]" />
+                        <strong className="text-[#8C5308]">WARN:</strong> &ge;{qcThresholds.warn_depth}x depth, &ge;{qcThresholds.warn_breadth}% breadth, &le;{qcThresholds.warn_max_n}% internal N
                       </span>
                       <span className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-red-500" />
-                        <strong className="text-slate-900">FAIL:</strong> &lt;{qcThresholds.warn_depth}x depth, &lt;{qcThresholds.warn_breadth}% breadth, or &gt;{qcThresholds.warn_max_n}% N
+                        <span className="w-2 h-2 rounded-full bg-[#C0392B]" />
+                        <strong className="text-[#A62C22]">FAIL:</strong> &lt;{qcThresholds.warn_depth}x depth, &lt;{qcThresholds.warn_breadth}% breadth, or &gt;{qcThresholds.warn_max_n}% N
                       </span>
                     </div>
 
                     {reportData.samples.length === 0 ? (
-                      <div className="p-8 text-center text-slate-500 border border-slate-200 rounded-xl bg-slate-50">
+                      <div className="p-8 text-center text-[#6B7280] border border-[#E2E6EA] rounded-[6px] bg-[#F8F9FA] text-[13px]">
                         No samples present in this run report.
                       </div>
                     ) : (
-                      <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white max-w-full">
-                        <table className="w-full text-left text-xs border-collapse">
+                      <div className="overflow-x-auto border border-[#E2E6EA] rounded-[6px] bg-white max-w-full">
+                        <table className="w-full text-left text-[13px] border-collapse">
                           <thead>
-                            <tr className="border-b border-slate-200 text-slate-700 bg-slate-100 select-none">
+                            <tr className="border-b border-[#E2E6EA] text-[#4B5563] bg-[#F1F3F5] text-[11px] uppercase tracking-[0.04em] select-none">
                               {[
-                                { id: 'sample_id', label: 'Sample ID' },
-                                { id: 'trimmed_reads', label: 'Filtered Reads' },
-                                { id: 'mapped_reads', label: 'Mapped Reads' },
-                                { id: 'mean_depth', label: 'Mean Depth' },
-                                { id: 'coverage_breadth', label: `Cov Breadth (≥${minCovThreshold}x)` },
-                                { id: 'n_content', label: 'Internal N%' },
-                                { id: 'consensus_length', label: 'Consensus Len' },
-                                { id: 'snps_called', label: 'Variants' },
-                              ].map((col) => (
-                                <th
-                                  key={col.id}
-                                  className="p-3.5 font-semibold cursor-pointer hover:text-slate-900 transition-colors"
-                                  onClick={() => handleSort(col.id)}
-                                >
-                                  <div className="flex items-center gap-1">
-                                    {col.label} <ArrowUpDown className="w-3 h-3 text-red-600" />
-                                  </div>
-                                </th>
-                              ))}
+                                { id: 'sample_id', label: 'Sample ID', align: 'left' },
+                                { id: 'trimmed_reads', label: 'Filtered Reads', align: 'right' },
+                                { id: 'mapped_reads', label: 'Mapped Reads', align: 'right' },
+                                { id: 'mean_depth', label: 'Mean Depth', align: 'right' },
+                                { id: 'coverage_breadth', label: `Cov Breadth (≥${minCovThreshold}x)`, align: 'right' },
+                                { id: 'n_content', label: 'Internal N%', align: 'right' },
+                                { id: 'consensus_length', label: 'Consensus Len', align: 'right' },
+                                { id: 'snps_called', label: 'Variants', align: 'right' },
+                              ].map((col) => {
+                                const isActiveSort = sortField === col.id;
+                                return (
+                                  <th
+                                    key={col.id}
+                                    className={`${
+                                      col.id === 'sample_id' ? 'pl-3.5 pr-2.5' : 'px-2.5'
+                                    } py-2.5 font-semibold cursor-pointer hover:text-[#111827] transition-colors whitespace-nowrap ${
+                                      col.align === 'right' ? 'text-right' : 'text-left'
+                                    }`}
+                                    onClick={() => handleSort(col.id)}
+                                  >
+                                    <div className={`flex items-center gap-1 ${col.align === 'right' ? 'justify-end' : ''}`}>
+                                      {col.label}
+                                      <ArrowUpDown
+                                        className={`w-3 h-3 shrink-0 ${
+                                          isActiveSort ? 'text-[#0F5C6E]' : 'text-[#9CA3AF]'
+                                        }`}
+                                      />
+                                    </div>
+                                  </th>
+                                );
+                              })}
                               <th
-                                className="p-3.5 font-semibold cursor-pointer hover:text-slate-900 transition-colors text-center"
+                                className="pl-2.5 pr-3.5 py-2.5 font-semibold cursor-pointer hover:text-[#111827] transition-colors text-center whitespace-nowrap"
                                 onClick={() => handleSort('status')}
                               >
                                 <div className="flex items-center justify-center gap-1">
-                                  Status <ArrowUpDown className="w-3 h-3 text-red-600" />
+                                  Status
+                                  <ArrowUpDown
+                                    className={`w-3 h-3 shrink-0 ${
+                                      sortField === 'status' ? 'text-[#0F5C6E]' : 'text-[#9CA3AF]'
+                                    }`}
+                                  />
                                 </div>
                               </th>
                             </tr>
@@ -538,81 +586,93 @@ export default function App() {
                               return (
                                 <tr
                                   key={sample.sample_id}
-                                  className="border-b border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors"
+                                  className="border-b border-[#E2E6EA] last:border-none hover:bg-[#F8F9FA] cursor-pointer transition-colors"
                                   onClick={() => {
                                     setSelectedSampleId(sample.sample_id);
                                     if (refName) setSelectedRefName(refName);
                                     setActiveTab('details');
                                   }}
                                 >
-                                  <td className="p-3.5 font-semibold text-slate-900">
-                                    <div>{sample.sample_id}</div>
+                                  <td className="pl-3.5 pr-2.5 py-2.5 font-semibold text-[#111827] max-w-[230px]">
+                                    <div className="truncate" title={sample.sample_id}>{sample.sample_id}</div>
                                     {coDetections.length > 1 ? (
-                                      <div className="text-[10px] text-violet-700 font-bold mt-0.5">
+                                      <div className="text-[11px] text-[#0F5C6E] font-semibold mt-0.5 font-mono break-words leading-snug">
                                         Co-detection: {coDetections.join(' + ')}
                                       </div>
                                     ) : (
-                                      refName && <div className="text-[10px] text-slate-500 font-normal mt-0.5">{refName}</div>
+                                      refName && (
+                                        <div className="text-[11px] text-[#6B7280] font-normal mt-0.5 font-mono truncate" title={refName}>
+                                          {refName}
+                                        </div>
+                                      )
                                     )}
                                   </td>
-                                  <td className="p-3.5 font-mono text-slate-700">
+                                  <td className="px-2.5 py-2.5 font-mono text-right text-[#111827] whitespace-nowrap">
                                     <div>{filteredReads.toLocaleString()}</div>
-                                    <div className="text-[10px] text-slate-400">
+                                    <div className="text-[11px] text-[#6B7280]">
                                       Dup: {formatMetric(sample.qc?.duplication_rate, { decimals: 1, suffix: '%', isRatioPercent: true })}
                                     </div>
                                   </td>
-                                  <td className="p-3.5 font-mono text-indigo-700 font-medium">
+                                  <td className="px-2.5 py-2.5 font-mono text-right text-[#111827] whitespace-nowrap">
                                     {mappedReads === null
                                       ? 'N/A'
                                       : `${mappedReads.toLocaleString()} (${mappedPct || '0.0%'})`}
                                   </td>
-                                  <td className={`p-3.5 font-mono font-semibold ${
-                                    evalDepth >= qcThresholds.pass_depth
-                                      ? 'text-emerald-600'
-                                      : evalDepth >= qcThresholds.warn_depth
-                                      ? 'text-amber-600'
-                                      : 'text-red-600'
-                                  }`}>
-                                    <div>{evalDepth.toLocaleString()}x</div>
+                                  <td
+                                    className={`px-2.5 py-2.5 font-mono text-right font-semibold whitespace-nowrap ${
+                                      evalDepth >= qcThresholds.pass_depth
+                                        ? 'text-[#16654A]'
+                                        : evalDepth >= qcThresholds.warn_depth
+                                        ? 'text-[#8C5308]'
+                                        : 'text-[#A62C22]'
+                                    }`}
+                                  >
+                                    <div>{formatDepth(evalDepth)}</div>
                                     {cov.callable_mean_depth !== undefined && cov.mean_depth !== cov.callable_mean_depth && (
-                                      <div className="text-[10px] text-slate-400 font-normal">
-                                        whole: {cov.mean_depth.toLocaleString()}x
+                                      <div className="text-[11px] text-[#6B7280] font-normal">
+                                        whole: {formatDepth(cov.mean_depth)}
                                       </div>
                                     )}
                                   </td>
-                                  <td className={`p-3.5 font-mono font-bold ${
-                                    evalBreadth >= qcThresholds.pass_breadth
-                                      ? 'text-emerald-600'
-                                      : evalBreadth >= qcThresholds.warn_breadth
-                                      ? 'text-amber-600'
-                                      : 'text-red-600'
-                                  }`}>
+                                  <td
+                                    className={`px-2.5 py-2.5 font-mono text-right font-semibold whitespace-nowrap ${
+                                      evalBreadth >= qcThresholds.pass_breadth
+                                        ? 'text-[#16654A]'
+                                        : evalBreadth >= qcThresholds.warn_breadth
+                                        ? 'text-[#8C5308]'
+                                        : 'text-[#A62C22]'
+                                    }`}
+                                  >
                                     <div>{evalBreadth.toFixed(2)}%</div>
                                     {cov.callable_breadth_min_cov !== undefined && cov.qc_basis !== 'whole_contig' && (
-                                      <div className="text-[10px] text-slate-400 font-normal">
+                                      <div className="text-[11px] text-[#6B7280] font-normal">
                                         whole: {wholeBreadth.toFixed(2)}%
                                       </div>
                                     )}
                                   </td>
-                                  <td className={`p-3.5 font-mono font-bold ${
-                                    evalNRate <= qcThresholds.pass_max_n
-                                      ? 'text-emerald-600'
-                                      : evalNRate <= qcThresholds.warn_max_n
-                                      ? 'text-amber-600'
-                                      : 'text-red-600'
-                                  }`}>
+                                  <td
+                                    className={`px-2.5 py-2.5 font-mono text-right font-semibold whitespace-nowrap ${
+                                      evalNRate <= qcThresholds.pass_max_n
+                                        ? 'text-[#16654A]'
+                                        : evalNRate <= qcThresholds.warn_max_n
+                                        ? 'text-[#8C5308]'
+                                        : 'text-[#A62C22]'
+                                    }`}
+                                  >
                                     <div>{evalNRate.toFixed(2)}%</div>
                                     {cons.internal_n_content !== undefined && cov.qc_basis !== 'whole_contig' && (
-                                      <div className="text-[10px] text-slate-400 font-normal">
+                                      <div className="text-[11px] text-[#6B7280] font-normal">
                                         whole: {(cons.n_content ?? 0).toFixed(2)}%
                                       </div>
                                     )}
                                   </td>
-                                  <td className="p-3.5 font-mono text-slate-700">
+                                  <td className="px-2.5 py-2.5 font-mono text-right text-[#111827] whitespace-nowrap">
                                     {(cons.length ?? 0).toLocaleString()} bp
                                   </td>
-                                  <td className="p-3.5 font-mono text-slate-700">{primaryVarsCount}</td>
-                                  <td className="p-3.5 text-center">
+                                  <td className="px-2.5 py-2.5 font-mono text-right text-[#111827] whitespace-nowrap">
+                                    {primaryVarsCount}
+                                  </td>
+                                  <td className="pl-2.5 pr-3.5 py-2.5 text-center whitespace-nowrap">
                                     <StatusBadge
                                       status={statusInfo.status}
                                       reasons={statusInfo.reasons}
@@ -657,11 +717,13 @@ export default function App() {
                   const evalBreadth = getEvalBreadth(activeSample, targetRef);
 
                   return (
-                    <div className="flex flex-col gap-6">
-                      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 glass-panel rounded-2xl">
-                        <div className="flex flex-wrap items-center gap-4">
+                    <div className="flex flex-col gap-5">
+                      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 glass-panel">
+                        <div className="flex flex-wrap items-center gap-3">
                           <div className="flex items-center gap-2">
-                            <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">Active Sample:</span>
+                            <span className="text-[11px] text-[#6B7280] font-semibold uppercase tracking-[0.06em]">
+                              Active Sample:
+                            </span>
                             <select
                               value={selectedSampleId}
                               onChange={(e) => {
@@ -671,7 +733,7 @@ export default function App() {
                                 const bestRef = getBestReference(nextSample, reportData);
                                 if (bestRef) setSelectedRefName(bestRef.name);
                               }}
-                              className="bg-slate-50 border border-slate-200 text-slate-900 text-sm rounded-xl px-3.5 py-2 focus:outline-none cursor-pointer"
+                              className="bg-white border border-[#CBD2D9] text-[#111827] text-xs font-medium rounded-[4px] px-3 py-1.5 focus:outline-none focus:border-[#0F5C6E] cursor-pointer"
                             >
                               {[...reportData.samples]
                                 .sort((a, b) => a.sample_id.localeCompare(b.sample_id, undefined, { numeric: true, sensitivity: 'base' }))
@@ -685,11 +747,13 @@ export default function App() {
 
                           {refsList.length > 1 && (
                             <div className="flex items-center gap-2">
-                              <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">Reference:</span>
+                              <span className="text-[11px] text-[#6B7280] font-semibold uppercase tracking-[0.06em]">
+                                Reference:
+                              </span>
                               <select
                                 value={targetRef}
                                 onChange={(e) => setSelectedRefName(e.target.value)}
-                                className="bg-slate-50 border border-slate-200 text-slate-900 text-sm rounded-xl px-3.5 py-2 focus:outline-none cursor-pointer"
+                                className="bg-white border border-[#CBD2D9] text-[#111827] text-xs font-mono rounded-[4px] px-3 py-1.5 focus:outline-none focus:border-[#0F5C6E] cursor-pointer"
                               >
                                 {refsList.map((r) => (
                                   <option key={r.name} value={r.name}>
@@ -707,45 +771,53 @@ export default function App() {
                               triggerBrowserDownload(fasta, `${activeSample.sample_id}_${targetRef || 'consensus'}.fasta`, 'text/plain;charset=utf-8;');
                             }}
                             disabled={!activeCons?.sequence}
-                            className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-300 text-slate-700 text-xs font-semibold rounded-xl hover:bg-slate-50 disabled:opacity-40"
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#CBD2D9] text-[#111827] text-xs font-semibold rounded-[4px] hover:border-[#0F5C6E] hover:text-[#0F5C6E] disabled:opacity-40 transition-colors"
                           >
-                            <Download className="w-3.5 h-3.5 text-red-600" />
+                            <Download className="w-3.5 h-3.5 text-[#0F5C6E]" />
                             Sample FASTA
                           </button>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#4B5563] tabular-nums">
                           <span>
                             Mapped:{' '}
-                            <strong className="text-indigo-700 font-mono">
+                            <strong className="text-[#111827] font-mono">
                               {mappedReads === null
                                 ? 'N/A'
                                 : `${mappedReads.toLocaleString()} (${mappedPct || '0.0'}%)`}
                             </strong>
                           </span>
-                          <span className="text-slate-300">|</span>
+                          <span className="text-[#CBD2D9]">|</span>
                           <span>
                             Callable Depth:{' '}
-                            <strong className={`font-mono ${evalDepth >= qcThresholds.pass_depth ? 'text-emerald-600' : evalDepth >= qcThresholds.warn_depth ? 'text-amber-600' : 'text-red-600'}`}>
-                              {evalDepth}x
+                            <strong
+                              className={`font-mono ${
+                                evalDepth >= qcThresholds.pass_depth
+                                  ? 'text-[#16654A]'
+                                  : evalDepth >= qcThresholds.warn_depth
+                                  ? 'text-[#8C5308]'
+                                  : 'text-[#A62C22]'
+                              }`}
+                            >
+                              {formatDepth(evalDepth)}
                             </strong>
                           </span>
-                          <span className="text-slate-300">|</span>
+                          <span className="text-[#CBD2D9]">|</span>
                           <span>
                             Breadth (&ge;{minCovThreshold}x):{' '}
-                            <strong className="font-mono text-slate-900">{evalBreadth.toFixed(2)}%</strong>
+                            <strong className="font-mono text-[#111827]">{evalBreadth.toFixed(2)}%</strong>
                           </span>
-                          <span className="text-slate-300">|</span>
+                          <span className="text-[#CBD2D9]">|</span>
                           <span>
                             Q30 Trim:{' '}
-                            <strong className="font-mono text-slate-900">
+                            <strong className="font-mono text-[#111827]">
                               {formatMetric(activeSample.qc?.q30_rate_trimmed, { decimals: 1, suffix: '%', isRatioPercent: true })}
                             </strong>
                           </span>
-                          <span className="text-slate-300">|</span>
+                          <span className="text-[#CBD2D9]">|</span>
                           <span>
                             Dup:{' '}
-                            <strong className="font-mono text-slate-900">
+                            <strong className="font-mono text-[#111827]">
                               {formatMetric(activeSample.qc?.duplication_rate, { decimals: 1, suffix: '%', isRatioPercent: true })}
                             </strong>
                           </span>
@@ -753,15 +825,15 @@ export default function App() {
                       </div>
 
                       {activeSample.metadata && Object.keys(activeSample.metadata).length > 0 && (
-                        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs bg-slate-100 border border-slate-200 rounded-2xl p-4">
+                        <div className="flex flex-wrap items-center gap-x-6 gap-y-1.5 text-xs bg-[#F1F3F5] border border-[#E2E6EA] rounded-[6px] px-4 py-2.5">
                           {Object.entries(activeSample.metadata)
                             .filter(([k]) => k !== 'sample_id')
                             .map(([key, val]) => (
                               <span key={key}>
-                                <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mr-2">
+                                <span className="text-[11px] text-[#6B7280] uppercase font-semibold tracking-[0.04em] mr-1.5">
                                   {key.replace(/_/g, ' ')}:
                                 </span>
-                                <strong className="text-slate-900 font-semibold">{val}</strong>
+                                <strong className="text-[#111827] font-semibold">{val}</strong>
                               </span>
                             ))}
                         </div>
@@ -832,21 +904,24 @@ export default function App() {
                   const pdfCov = getContigCoverage(activeSample, pdfRefName);
                   const pdfCons = getContigConsensus(activeSample, pdfRefName);
                   const coDetections = getCoDetections(activeSample, reportData);
+                  const overallStatus = getSampleStatus(activeSample, reportData);
                   const stableReportId = computeStableReportId(reportData.run_id, activeSample.sample_id);
 
                   return (
-                    <div className="flex flex-col gap-6">
-                      <div className="flex flex-wrap items-center justify-between gap-4 p-4 glass-panel rounded-2xl no-print">
+                    <div className="flex flex-col gap-5">
+                      <div className="flex flex-wrap items-center justify-between gap-4 p-4 glass-panel no-print">
                         <div>
-                          <h4 className="text-sm font-semibold text-slate-900">Genomic Epidemiological PDF Generator</h4>
-                          <p className="text-xs text-slate-500">Multi-page print layout with run configuration and software provenance.</p>
+                          <h4 className="text-[14px] font-semibold text-[#111827]">Genomic Epidemiological PDF Generator</h4>
+                          <p className="text-[12px] text-[#6B7280]">
+                            Multi-page print layout with QC verdict, run configuration, and software provenance.
+                          </p>
                         </div>
 
                         <div className="flex items-center gap-3">
                           <select
                             value={selectedSampleId}
                             onChange={(e) => setSelectedSampleId(e.target.value)}
-                            className="bg-slate-50 border border-slate-200 text-slate-900 text-xs rounded-xl px-3 py-1.5 focus:outline-none cursor-pointer"
+                            className="bg-white border border-[#CBD2D9] text-[#111827] text-xs font-medium rounded-[4px] px-3 py-1.5 focus:outline-none focus:border-[#0F5C6E] cursor-pointer"
                           >
                             {[...reportData.samples]
                               .sort((a, b) => a.sample_id.localeCompare(b.sample_id, undefined, { numeric: true, sensitivity: 'base' }))
@@ -859,67 +934,94 @@ export default function App() {
 
                           <button
                             onClick={() => window.print()}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white text-xs font-bold rounded-xl hover:bg-red-700 active:scale-95 transition-all"
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0F5C6E] hover:bg-[#0B4654] text-white text-xs font-semibold rounded-[4px] transition-colors"
                           >
-                            <Printer className="w-4 h-4" />
+                            <Printer className="w-3.5 h-3.5" />
                             Print / Save PDF
                           </button>
                         </div>
                       </div>
 
-                      <div className="p-8 bg-white text-slate-800 rounded-3xl max-w-4xl mx-auto shadow-lg flex flex-col gap-8 border border-slate-200 print-card">
-                        <div className="flex items-start justify-between border-b border-slate-200 pb-6 print-avoid-break">
+                      <div className="p-8 bg-white text-[#111827] rounded-[6px] max-w-4xl mx-auto flex flex-col gap-7 border border-[#E2E6EA] print-card w-full">
+                        <div className="flex items-start justify-between border-b border-[#E2E6EA] pb-5 print-avoid-break">
                           <div className="flex flex-col gap-1.5">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-red-600">Genomic Epidemiology Report</span>
-                            <h2 className="text-2xl font-bold text-slate-900 leading-none">Pathogen Genomics Summary</h2>
-                            <span className="text-xs text-slate-500 font-mono mt-1">Report ID: {stableReportId}</span>
+                            <div className="flex items-center gap-2.5">
+                              <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[#0F5C6E]">
+                                Genomic Epidemiology Report
+                              </span>
+                              <span
+                                className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-[4px] border ${getQcBadgeClasses(
+                                  overallStatus.status
+                                )}`}
+                              >
+                                QC Verdict: {overallStatus.status}
+                              </span>
+                            </div>
+                            <h2 className="text-[22px] font-bold text-[#111827] leading-tight">
+                              Pathogen Genomics Summary
+                            </h2>
+                            <span className="text-xs text-[#6B7280] font-mono">Report ID: {stableReportId}</span>
                           </div>
                           <div className="flex flex-col items-end text-right gap-1 text-xs">
-                            <span className="font-semibold text-slate-700">Viromics ({platformLabel})</span>
-                            <span className="text-slate-500">Run ID: {reportData.run_id}</span>
-                            <span className="text-slate-400 font-mono text-[10px]">
+                            <span className="font-semibold text-[#111827]">Viromics ({platformLabel})</span>
+                            <span className="text-[#4B5563] font-mono">Run ID: {reportData.run_id}</span>
+                            <span className="text-[#6B7280] font-mono text-[11px]">
                               Schema v{reportData.schema_version || '1.0'} · Depth&ge;{minCovThreshold}x
                             </span>
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-6 bg-slate-50 p-5 rounded-2xl border border-slate-200 print-avoid-break">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-5 bg-[#F8F9FA] p-4 rounded-[6px] border border-[#E2E6EA] print-avoid-break">
                           <div className="flex flex-col gap-1">
-                            <span className="text-[10px] uppercase font-bold text-slate-500">Sample Identifier</span>
-                            <strong className="text-sm font-semibold text-slate-900">{activeSample.sample_id}</strong>
+                            <span className="text-[11px] uppercase font-semibold tracking-[0.04em] text-[#6B7280]">
+                              Sample Identifier
+                            </span>
+                            <strong className="text-[13px] font-semibold text-[#111827]">{activeSample.sample_id}</strong>
                           </div>
                           <div className="flex flex-col gap-1">
-                            <span className="text-[10px] uppercase font-bold text-slate-500">Reference Target</span>
-                            <strong className="text-sm font-semibold text-slate-900 font-mono">
+                            <span className="text-[11px] uppercase font-semibold tracking-[0.04em] text-[#6B7280]">
+                              Reference Target
+                            </span>
+                            <strong className="text-[13px] font-semibold text-[#111827] font-mono break-all">
                               {coDetections.length > 1 ? `Co-detection: ${coDetections.join(' + ')}` : pdfRefName}
                             </strong>
                           </div>
                           <div className="flex flex-col gap-1">
-                            <span className="text-[10px] uppercase font-bold text-slate-500">Consensus Length</span>
-                            <strong className="text-sm font-semibold text-slate-900 font-mono">
+                            <span className="text-[11px] uppercase font-semibold tracking-[0.04em] text-[#6B7280]">
+                              Consensus Length
+                            </span>
+                            <strong className="text-[13px] font-semibold text-[#111827] font-mono tabular-nums">
                               {coDetections.length > 1
                                 ? coDetections
-                                    .map((c) => `${getContigConsensus(activeSample, c).length ?? 0} bp (${c})`)
+                                    .map((c) => `${(getContigConsensus(activeSample, c).length ?? 0).toLocaleString()} bp (${c})`)
                                     .join(' | ')
                                 : `${(pdfCons.length ?? 0).toLocaleString()} bp`}
+                            </strong>
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[11px] uppercase font-semibold tracking-[0.04em] text-[#6B7280]">
+                              Evaluation Basis
+                            </span>
+                            <strong className="text-[13px] font-semibold text-[#111827] font-mono">
+                              {overallStatus.basis || 'whole_contig'}
                             </strong>
                           </div>
                         </div>
 
                         <div className="print-avoid-break">
-                          <h3 className="text-xs font-bold text-slate-900 border-b border-slate-200 pb-2 mb-4 uppercase tracking-wider">
+                          <h3 className="text-[11px] font-semibold text-[#111827] border-b border-[#E2E6EA] pb-2 mb-3.5 uppercase tracking-[0.06em]">
                             Sequencing Quality Assurance
                           </h3>
                           {coDetections.length > 1 ? (
-                            <div className="overflow-hidden border border-slate-200 rounded-xl">
+                            <div className="overflow-x-auto border border-[#E2E6EA] rounded-[6px]">
                               <table className="w-full text-left text-xs border-collapse">
                                 <thead>
-                                  <tr className="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200">
+                                  <tr className="bg-[#F1F3F5] text-[#4B5563] font-semibold border-b border-[#E2E6EA] text-[11px] uppercase tracking-[0.04em]">
                                     <th className="p-3">Detected Strain</th>
-                                    <th className="p-3">Mapped Reads</th>
-                                    <th className="p-3">Callable Depth</th>
-                                    <th className="p-3">Callable Breadth (&ge;{minCovThreshold}x)</th>
-                                    <th className="p-3">Internal N Rate</th>
+                                    <th className="p-3 text-right">Mapped Reads</th>
+                                    <th className="p-3 text-right">Callable Depth</th>
+                                    <th className="p-3 text-right">Callable Breadth (&ge;{minCovThreshold}x)</th>
+                                    <th className="p-3 text-right">Internal N Rate</th>
                                     <th className="p-3 text-center">Status</th>
                                   </tr>
                                 </thead>
@@ -933,13 +1035,29 @@ export default function App() {
                                     const breadth = getEvalBreadth(activeSample, c);
                                     const nRate = getEvalNRate(activeSample, c);
                                     return (
-                                      <tr key={c} className="border-b border-slate-100 text-slate-700">
-                                        <td className="p-3 font-semibold text-slate-900">{c}</td>
-                                        <td className="p-3 font-mono">{mr === null ? 'N/A' : `${mr.toLocaleString()} (${pct || '0.0'}%)`}</td>
-                                        <td className="p-3 font-mono font-semibold">{depth.toLocaleString()}x</td>
-                                        <td className="p-3 font-mono font-bold">{breadth.toFixed(2)}%</td>
-                                        <td className="p-3 font-mono font-bold">{nRate.toFixed(2)}%</td>
-                                        <td className="p-3 text-center font-bold">{statusInfo.status}</td>
+                                      <tr key={c} className="border-b border-[#E2E6EA] last:border-none text-[#111827]">
+                                        <td className="p-3 font-mono font-semibold text-[#111827]">{c}</td>
+                                        <td className="p-3 font-mono text-right whitespace-nowrap">
+                                          {mr === null ? 'N/A' : `${mr.toLocaleString()} (${pct || '0.0'}%)`}
+                                        </td>
+                                        <td className="p-3 font-mono text-right font-semibold whitespace-nowrap">
+                                          {formatDepth(depth)}
+                                        </td>
+                                        <td className="p-3 font-mono text-right font-semibold whitespace-nowrap">
+                                          {breadth.toFixed(2)}%
+                                        </td>
+                                        <td className="p-3 font-mono text-right font-semibold whitespace-nowrap">
+                                          {nRate.toFixed(2)}%
+                                        </td>
+                                        <td className="p-3 text-center whitespace-nowrap">
+                                          <span
+                                            className={`inline-block px-2 py-0.5 rounded-[4px] border text-[11px] font-semibold ${getQcBadgeClasses(
+                                              statusInfo.status
+                                            )}`}
+                                          >
+                                            {statusInfo.status}
+                                          </span>
+                                        </td>
                                       </tr>
                                     );
                                   })}
@@ -947,41 +1065,51 @@ export default function App() {
                               </table>
                             </div>
                           ) : (
-                            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
-                              <div className="p-3 border border-slate-200 rounded-xl bg-slate-50">
-                                <span className="text-[9px] uppercase font-bold text-slate-500 block">Filtered Reads</span>
-                                <strong className="text-sm text-slate-900 font-semibold font-mono">
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-center">
+                              <div className="p-3 border border-[#E2E6EA] rounded-[4px] bg-[#F8F9FA]">
+                                <span className="text-[10px] uppercase font-semibold tracking-[0.04em] text-[#6B7280] block">
+                                  Filtered Reads
+                                </span>
+                                <strong className="text-sm text-[#111827] font-semibold font-mono tabular-nums mt-0.5 block">
                                   {(activeSample.qc?.trimmed_reads ?? 0).toLocaleString()}
                                 </strong>
                               </div>
-                              <div className="p-3 border border-slate-200 rounded-xl bg-slate-50">
-                                <span className="text-[9px] uppercase font-bold text-slate-500 block">Mapped Reads</span>
-                                <strong className="text-sm text-indigo-700 font-semibold font-mono">
+                              <div className="p-3 border border-[#E2E6EA] rounded-[4px] bg-[#F8F9FA]">
+                                <span className="text-[10px] uppercase font-semibold tracking-[0.04em] text-[#6B7280] block">
+                                  Mapped Reads
+                                </span>
+                                <strong className="text-sm text-[#111827] font-semibold font-mono tabular-nums mt-0.5 block">
                                   {(() => {
                                     const mr = getMappedReads(activeSample, pdfRefName);
                                     return mr === null ? 'N/A' : mr.toLocaleString();
                                   })()}
                                 </strong>
                               </div>
-                              <div className="p-3 border border-slate-200 rounded-xl bg-slate-50">
-                                <span className="text-[9px] uppercase font-bold text-slate-500 block">Callable Depth</span>
-                                <strong className="text-sm text-slate-900 font-semibold font-mono">
-                                  {getEvalDepth(activeSample, pdfRefName).toLocaleString()}x
+                              <div className="p-3 border border-[#E2E6EA] rounded-[4px] bg-[#F8F9FA]">
+                                <span className="text-[10px] uppercase font-semibold tracking-[0.04em] text-[#6B7280] block">
+                                  Callable Depth
+                                </span>
+                                <strong className="text-sm text-[#111827] font-semibold font-mono tabular-nums mt-0.5 block">
+                                  {formatDepth(getEvalDepth(activeSample, pdfRefName))}
                                 </strong>
                               </div>
-                              <div className="p-3 border border-slate-200 rounded-xl bg-slate-50">
-                                <span className="text-[9px] uppercase font-bold text-slate-500 block">Breadth (&ge;{minCovThreshold}x)</span>
-                                <strong className="text-sm text-slate-900 font-bold font-mono">
+                              <div className="p-3 border border-[#E2E6EA] rounded-[4px] bg-[#F8F9FA]">
+                                <span className="text-[10px] uppercase font-semibold tracking-[0.04em] text-[#6B7280] block">
+                                  Breadth (&ge;{minCovThreshold}x)
+                                </span>
+                                <strong className="text-sm text-[#111827] font-semibold font-mono tabular-nums mt-0.5 block">
                                   {getEvalBreadth(activeSample, pdfRefName).toFixed(2)}%
                                 </strong>
                               </div>
-                              <div className="p-3 border border-slate-200 rounded-xl bg-slate-50">
-                                <span className="text-[9px] uppercase font-bold text-slate-500 block">Internal N Rate</span>
-                                <strong className="text-sm text-slate-900 font-bold font-mono">
+                              <div className="p-3 border border-[#E2E6EA] rounded-[4px] bg-[#F8F9FA]">
+                                <span className="text-[10px] uppercase font-semibold tracking-[0.04em] text-[#6B7280] block">
+                                  Internal N Rate
+                                </span>
+                                <strong className="text-sm text-[#111827] font-semibold font-mono tabular-nums mt-0.5 block">
                                   {getEvalNRate(activeSample, pdfRefName).toFixed(2)}%
                                 </strong>
                                 {pdfCov.qc_basis && pdfCov.qc_basis !== 'whole_contig' && (
-                                  <span className="text-[9px] text-slate-400 block">
+                                  <span className="text-[10px] text-[#6B7280] font-mono block">
                                     whole N: {(pdfCons.n_content ?? 0).toFixed(2)}%
                                   </span>
                                 )}
@@ -990,71 +1118,86 @@ export default function App() {
                           )}
                         </div>
 
-                        {Object.keys(softwareVersions).length > 0 && (
-                          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-[10px] font-mono text-slate-600 print-avoid-break">
-                            <strong className="text-slate-800 mr-2">Provenance:</strong>
-                            {Object.entries(softwareVersions)
-                              .map(([tool, ver]) => `${tool}=${ver}`)
-                              .join(' · ')}
+                        {versionEntries.length > 0 && (
+                          <div className="bg-[#F1F3F5] border border-[#E2E6EA] rounded-[4px] p-3 text-[11px] font-mono text-[#4B5563] print-avoid-break">
+                            <strong className="text-[#111827] mr-2">Provenance:</strong>
+                            {versionEntries.map(([tool, ver]) => `${tool}=${ver}`).join(' · ')}
                           </div>
                         )}
 
-                        <div className="flex flex-col gap-6">
+                        <div className="flex flex-col gap-5">
                           {(() => {
                             const allVariants = activeSample.variants || [];
                             const renderMutationsTable = (titleLabel, filteredVars) => (
                               <div className="flex flex-col gap-3">
-                                <div className="flex justify-between items-center border-b border-slate-200 pb-2">
-                                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                                    Identified Variants: {titleLabel}
+                                <div className="flex justify-between items-center border-b border-[#E2E6EA] pb-2">
+                                  <h3 className="text-[11px] font-semibold text-[#111827]">
+                                    <span className="uppercase tracking-[0.06em]">Identified Variants:</span>{' '}
+                                    <span className="font-mono normal-case font-semibold text-[#0F5C6E]">
+                                      {titleLabel}
+                                    </span>
                                   </h3>
-                                  <span className="text-[10px] text-slate-600 font-semibold bg-slate-100 px-2 py-0.5 rounded-full">
+                                  <span className="text-[11px] text-[#4B5563] font-mono font-semibold bg-[#F1F3F5] border border-[#E2E6EA] px-2 py-0.5 rounded-[4px] tabular-nums">
                                     {filteredVars.length} variants
                                   </span>
                                 </div>
-                                <div className="overflow-hidden border border-slate-200 rounded-xl">
+                                <div className="overflow-x-auto border border-[#E2E6EA] rounded-[6px]">
                                   <table className="w-full text-left text-xs border-collapse">
                                     <thead>
-                                      <tr className="bg-slate-100 border-b border-slate-200 text-slate-600 font-semibold">
-                                        <th className="p-3">Position</th>
-                                        <th className="p-3">Allele</th>
-                                        <th className="p-3">Gene Region</th>
+                                      <tr className="bg-[#F1F3F5] border-b border-[#E2E6EA] text-[#4B5563] font-semibold text-[11px] uppercase tracking-[0.04em]">
+                                        <th className="p-3 whitespace-nowrap">Position</th>
+                                        <th className="p-3 whitespace-nowrap">Allele</th>
+                                        <th className="p-3 whitespace-nowrap">Gene Region</th>
                                         <th className="p-3">Protein Change</th>
-                                        <th className="p-3">Type</th>
-                                        <th className="p-3 text-right">Allele Freq</th>
+                                        <th className="p-3 whitespace-nowrap">Type</th>
+                                        <th className="p-3 text-right whitespace-nowrap">Allele Freq</th>
                                       </tr>
                                     </thead>
                                     <tbody>
                                       {filteredVars.length > 0 ? (
                                         filteredVars.map((v, i) => {
-                                          const cons = formatConsequences(v);
+                                          const cons = deduplicateConsequences(formatConsequences(v));
                                           return (
-                                            <tr key={i} className="border-b border-slate-100 text-slate-700">
-                                              <td className="p-3 font-mono font-medium">{v.position}</td>
-                                              <td className="p-3 font-mono font-bold text-slate-900">
+                                            <tr key={i} className="border-b border-[#E2E6EA] last:border-none text-[#111827]">
+                                              <td className="p-3 font-mono font-medium whitespace-nowrap">
+                                                {v.position.toLocaleString()}
+                                              </td>
+                                              <td className="p-3 font-mono font-semibold text-[#111827] whitespace-nowrap">
                                                 {v.ref} &gt; {v.alt}
                                               </td>
-                                              <td className="p-3">
-                                                <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                                              <td className="p-3 whitespace-nowrap">
+                                                <span className="px-2 py-0.5 rounded-[4px] text-[11px] font-semibold bg-[#F1F3F5] text-[#111827] border border-[#E2E6EA]">
                                                   {v.gene}
                                                 </span>
                                               </td>
                                               <td className="p-3 font-mono text-[11px]">
                                                 {cons.length > 0 ? (
-                                                  cons.map((c, cIdx) => (
-                                                    <span key={cIdx} className="mr-1.5">
-                                                      {cons.length > 1 ? `${c.gene}: ` : ''}
-                                                      <span className={c.kind === 'missense' || c.kind === 'nonsense' ? 'font-bold text-red-600' : c.kind === 'frameshift' || c.kind === 'indel' ? 'text-amber-700 font-semibold' : 'text-slate-500'}>
+                                                  <div className="flex flex-wrap gap-1.5">
+                                                    {cons.map((c, cIdx) => (
+                                                      <span
+                                                        key={cIdx}
+                                                        title={c.tooltip}
+                                                        className={
+                                                          c.kind === 'unavailable'
+                                                            ? 'text-[#6B7280] italic'
+                                                            : c.kind === 'synonymous'
+                                                            ? 'text-[#5C6773]'
+                                                            : c.kind === 'frameshift' || c.kind === 'indel'
+                                                            ? 'text-[#9A5B06] font-semibold'
+                                                            : 'text-[#B43B2E] font-semibold'
+                                                        }
+                                                      >
+                                                        {cons.length > 1 ? `${c.gene}: ` : ''}
                                                         {c.label}
                                                       </span>
-                                                    </span>
-                                                  ))
+                                                    ))}
+                                                  </div>
                                                 ) : (
-                                                  <span className="text-slate-400">-</span>
+                                                  <span className="text-[#6B7280]">-</span>
                                                 )}
                                               </td>
-                                              <td className="p-3">{v.type}</td>
-                                              <td className="p-3 font-mono text-right text-red-600 font-bold">
+                                              <td className="p-3 whitespace-nowrap text-[#4B5563]">{v.type}</td>
+                                              <td className="p-3 font-mono text-right text-[#0F5C6E] font-semibold whitespace-nowrap">
                                                 {(v.frequency * 100).toFixed(1)}%
                                               </td>
                                             </tr>
@@ -1062,7 +1205,7 @@ export default function App() {
                                         })
                                       ) : (
                                         <tr>
-                                          <td colSpan={6} className="p-4 text-center text-slate-400">
+                                          <td colSpan={6} className="p-4 text-center text-[#6B7280]">
                                             No variants identified for this reference strain.
                                           </td>
                                         </tr>
@@ -1090,14 +1233,18 @@ export default function App() {
                           })()}
                         </div>
 
-                        <div className="flex justify-between items-center border-t border-slate-200 pt-8 mt-4 text-xs print-avoid-break">
+                        <div className="flex justify-between items-center border-t border-[#E2E6EA] pt-7 mt-2 text-xs print-avoid-break">
                           <div className="flex flex-col gap-1">
-                            <div className="w-32 border-b border-slate-300 h-8" />
-                            <span className="text-slate-400 uppercase font-bold text-[9px] tracking-wider">Clinician / Assayer Signature</span>
+                            <div className="w-36 border-b border-[#CBD2D9] h-8" />
+                            <span className="text-[#6B7280] uppercase font-semibold text-[10px] tracking-[0.06em]">
+                              Clinician / Assayer Signature
+                            </span>
                           </div>
                           <div className="flex flex-col gap-1 text-right">
-                            <div className="w-32 border-b border-slate-300 h-8 self-end" />
-                            <span className="text-slate-400 uppercase font-bold text-[9px] tracking-wider">Lab Director Approval</span>
+                            <div className="w-36 border-b border-[#CBD2D9] h-8 self-end" />
+                            <span className="text-[#6B7280] uppercase font-semibold text-[10px] tracking-[0.06em]">
+                              Lab Director Approval
+                            </span>
                           </div>
                         </div>
                       </div>

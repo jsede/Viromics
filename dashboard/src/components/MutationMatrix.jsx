@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { HelpCircle, AlertCircle, ArrowUpDown, SlidersHorizontal } from 'lucide-react';
-import { formatConsequences, getEvalBreadth } from '../utils/reportSchema';
+import { AlertCircle, ArrowUpDown, SlidersHorizontal } from 'lucide-react';
+import { deduplicateConsequences, formatConsequences, formatDepth, getEvalBreadth } from '../utils/reportSchema';
 import { isVariantPositionLowCoverage } from '../utils/intervals';
 
 export default function MutationMatrix({
@@ -59,7 +59,7 @@ export default function MutationMatrix({
             type: v.type,
             aa_change: v.aa_change,
             status: v.status,
-            consequences: formatConsequences(v),
+            consequences: deduplicateConsequences(formatConsequences(v)),
           });
         }
       });
@@ -89,18 +89,18 @@ export default function MutationMatrix({
   }
 
   return (
-    <div className="p-6 glass-panel rounded-2xl flex flex-col gap-6">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+    <div className="p-5 glass-panel flex flex-col gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         <div>
-          <h3 className="text-lg font-semibold text-slate-900">Mutational Sharing Matrix</h3>
-          <p className="text-xs text-slate-500">
-            Reference-coordinate mutation matrix using indel-safe low-coverage interval lookup (reported AF &ge; {(defaultMinFreq * 100).toFixed(0)}%, consensus AF &ge; {(defaultConsFreq * 100).toFixed(0)}%).
+          <h3 className="text-[16px] font-semibold text-[#111827]">Mutational Sharing Matrix</h3>
+          <p className="text-[12px] text-[#6B7280] mt-0.5 tabular-nums">
+            Reference-coordinate sharing with indel-safe dropout lookup (AF &ge; {(defaultMinFreq * 100).toFixed(0)}%, consensus AF &ge; {(defaultConsFreq * 100).toFixed(0)}%)
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 shrink-0">
-          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-700">
-            <SlidersHorizontal className="w-3.5 h-3.5 text-red-600" />
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <div className="flex items-center gap-1.5 bg-white border border-[#CBD2D9] rounded-[4px] px-2.5 py-1 text-xs text-[#4B5563]">
+            <SlidersHorizontal className="w-3.5 h-3.5 text-[#0F5C6E]" />
             <span>Min Breadth %:</span>
             <input
               type="number"
@@ -109,11 +109,11 @@ export default function MutationMatrix({
               step={5}
               value={minBreadthCutoff}
               onChange={(e) => setMinBreadthCutoff(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
-              className="w-14 bg-white border border-slate-300 rounded px-1.5 py-0.5 text-xs font-mono text-slate-900"
+              className="w-14 bg-[#F8F9FA] border border-[#CBD2D9] rounded-[3px] px-1.5 py-0.5 text-xs font-mono text-[#111827] tabular-nums"
             />
           </div>
 
-          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-700">
+          <div className="flex items-center gap-1.5 bg-white border border-[#CBD2D9] rounded-[4px] px-2.5 py-1 text-xs text-[#4B5563]">
             <span>Clonal AF %:</span>
             <input
               type="number"
@@ -122,23 +122,23 @@ export default function MutationMatrix({
               step={5}
               value={clonalAfPct}
               onChange={(e) => setClonalAfPct(Math.max(10, Math.min(100, Number(e.target.value) || 50)))}
-              className="w-14 bg-white border border-slate-300 rounded px-1.5 py-0.5 text-xs font-mono text-slate-900"
+              className="w-14 bg-[#F8F9FA] border border-[#CBD2D9] rounded-[3px] px-1.5 py-0.5 text-xs font-mono text-[#111827] tabular-nums"
             />
           </div>
 
-          <div className="flex bg-slate-100 border border-slate-200 rounded-lg p-0.5 text-xs">
+          <div className="flex bg-[#F1F3F5] border border-[#E2E6EA] rounded-[4px] p-0.5 text-xs">
             <button
               onClick={() => setVariantScope('ALL')}
-              className={`px-2.5 py-1 rounded-md font-medium transition-colors ${
-                variantScope === 'ALL' ? 'bg-red-600 text-white font-semibold' : 'text-slate-600 hover:text-slate-900'
+              className={`px-2.5 py-1 rounded-[3px] font-medium transition-colors whitespace-nowrap ${
+                variantScope === 'ALL' ? 'bg-[#0F5C6E] text-white font-semibold' : 'text-[#4B5563] hover:text-[#111827]'
               }`}
             >
               All Variants
             </button>
             <button
               onClick={() => setVariantScope('CONSENSUS')}
-              className={`px-2.5 py-1 rounded-md font-medium transition-colors ${
-                variantScope === 'CONSENSUS' ? 'bg-red-600 text-white font-semibold' : 'text-slate-600 hover:text-slate-900'
+              className={`px-2.5 py-1 rounded-[3px] font-medium transition-colors whitespace-nowrap ${
+                variantScope === 'CONSENSUS' ? 'bg-[#0F5C6E] text-white font-semibold' : 'text-[#4B5563] hover:text-[#111827]'
               }`}
             >
               Consensus Only
@@ -149,7 +149,7 @@ export default function MutationMatrix({
             <select
               value={selectedRefName}
               onChange={(e) => setSelectedRefName(e.target.value)}
-              className="bg-slate-50 border border-slate-200 text-slate-900 text-xs rounded-xl px-3 py-1.5 focus:outline-none cursor-pointer"
+              className="bg-white border border-[#CBD2D9] text-[#111827] text-xs font-mono rounded-[4px] px-2.5 py-1.5 focus:outline-none focus:border-[#0F5C6E] cursor-pointer"
             >
               {refs.map((r) => (
                 <option key={r.name} value={r.name}>
@@ -161,48 +161,75 @@ export default function MutationMatrix({
         </div>
       </div>
 
+      {passingSamples.length > 0 && sortedMutations.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-[#4B5563] border-t border-[#E2E6EA] pt-2.5 tabular-nums">
+          <div className="flex items-center gap-2 whitespace-nowrap">
+            <div className="w-3.5 h-3.5 rounded-[3px] bg-[#0F5C6E] border border-[#0B4654]" />
+            <span>Clonal (&ge;{clonalAfPct}%)</span>
+          </div>
+          <div className="flex items-center gap-2 whitespace-nowrap">
+            <div className="w-3.5 h-3.5 rounded-[3px] bg-[#D4E8ED] border border-dashed border-[#0F5C6E]" />
+            <span>Subclonal (&lt;{clonalAfPct}%)</span>
+          </div>
+          <div className="flex items-center gap-2 whitespace-nowrap">
+            <div className="w-3.5 h-3.5 rounded-[3px] bg-white border border-[#CBD2D9]" />
+            <span>Reference Match</span>
+          </div>
+          <div className="flex items-center gap-2 whitespace-nowrap">
+            <div className="w-3.5 h-3.5 rounded-[3px] bg-[#E5E7EB] border border-[#CBD2D9] flex items-center justify-center text-[9px] font-mono text-[#4B5563] font-bold">
+              N
+            </div>
+            <span>Low Coverage (&lt;{minCoverageThreshold}x)</span>
+          </div>
+        </div>
+      )}
+
       {passingSamples.length === 0 ? (
-        <div className="p-8 text-center text-slate-500 border border-slate-200 rounded-xl bg-slate-50 flex flex-col items-center gap-2">
-          <AlertCircle className="w-8 h-8 text-amber-500" />
-          <p className="font-semibold text-slate-900">
+        <div className="p-8 text-center text-[#6B7280] border border-[#E2E6EA] rounded-[6px] bg-[#F8F9FA] flex flex-col items-center gap-2">
+          <AlertCircle className="w-6 h-6 text-[#8C5308]" />
+          <p className="font-semibold text-[#111827]">
             No samples have sufficient coverage (&ge; {minBreadthCutoff}%) for reference: {selectedRefName || 'all'}
           </p>
-          <p className="text-xs text-slate-500">Lower the Min Breadth filter above or select another reference strain.</p>
+          <p className="text-xs text-[#6B7280]">Lower the Min Breadth filter above or select another reference strain.</p>
         </div>
       ) : sortedMutations.length === 0 ? (
-        <div className="p-8 text-center text-slate-500 border border-slate-200 rounded-xl bg-slate-50">
+        <div className="p-8 text-center text-[#6B7280] border border-[#E2E6EA] rounded-[6px] bg-[#F8F9FA] text-[13px]">
           <p>
             No {variantScope === 'CONSENSUS' ? 'consensus ' : ''}variants identified across the {passingSamples.length} passing samples for {selectedRefName || 'all'}.
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white max-w-full">
+        <div className="overflow-x-auto border border-[#E2E6EA] rounded-[6px] bg-white max-w-full">
           <table className="border-collapse w-full min-w-[700px] text-xs">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-100">
+              <tr className="border-b border-[#E2E6EA] bg-[#F1F3F5]">
                 <th
-                  className="p-3 text-left font-semibold text-slate-700 border-r border-slate-200 w-48 shrink-0 cursor-pointer hover:text-slate-900 select-none"
+                  className="p-3 text-left font-semibold text-[#4B5563] border-r border-[#E2E6EA] w-48 shrink-0 cursor-pointer hover:text-[#111827] select-none text-[11px] uppercase tracking-[0.04em]"
                   onClick={() => setSortAsc(!sortAsc)}
                 >
                   <div className="flex items-center gap-1">
-                    Sample ID <ArrowUpDown className="w-3 h-3 text-red-600" />
+                    Sample ID <ArrowUpDown className="w-3 h-3 text-[#0F5C6E]" />
                   </div>
                 </th>
                 {sortedMutations.map((mut) => {
                   const primaryCons = mut.consequences[0] || null;
                   return (
-                    <th key={mut.id} className="p-2.5 text-center font-mono font-medium text-slate-700 border-r border-slate-200 min-w-20">
+                    <th key={mut.id} className="p-2 text-center font-mono font-medium text-[#4B5563] border-r border-[#E2E6EA] last:border-r-0 min-w-20">
                       <div className="flex flex-col items-center">
-                        <span className="text-[10px] text-indigo-600 font-bold">{mut.gene}</span>
-                        <span className="text-slate-900 font-semibold mt-0.5">{mut.ref}{mut.position}{mut.alt}</span>
+                        <span className="text-[10px] text-[#6B7280] font-semibold">{mut.gene}</span>
+                        <span className="text-[#111827] font-semibold mt-0.5 tabular-nums">
+                          {mut.ref}{mut.position}{mut.alt}
+                        </span>
                         {primaryCons && (
-                          <span className={`text-[9px] mt-0.5 ${
-                            primaryCons.kind === 'unavailable' || primaryCons.kind === 'synonymous'
-                              ? 'text-slate-400 font-normal'
-                              : primaryCons.kind === 'frameshift' || primaryCons.kind === 'indel'
-                              ? 'text-amber-700 font-semibold'
-                              : 'text-red-600 font-bold'
-                          }`}>
+                          <span
+                            className={`text-[10px] mt-0.5 ${
+                              primaryCons.kind === 'unavailable' || primaryCons.kind === 'synonymous'
+                                ? 'text-[#6B7280] font-normal'
+                                : primaryCons.kind === 'frameshift' || primaryCons.kind === 'indel'
+                                ? 'text-[#9A5B06] font-semibold'
+                                : 'text-[#B43B2E] font-semibold'
+                            }`}
+                          >
                             {mut.consequences.length > 1
                               ? mut.consequences.map((c) => c.label).join(' / ')
                               : primaryCons.label}
@@ -217,8 +244,8 @@ export default function MutationMatrix({
 
             <tbody>
               {sortedPassingSamples.map((sample) => (
-                <tr key={sample.sample_id} className="border-b border-slate-100 bg-white hover:bg-slate-50 transition-colors">
-                  <td className="p-3 font-semibold text-slate-900 border-r border-slate-200 truncate max-w-48">
+                <tr key={sample.sample_id} className="border-b border-[#E2E6EA] last:border-none bg-white hover:bg-[#F8F9FA] transition-colors">
+                  <td className="px-3 py-2 font-semibold text-[#111827] border-r border-[#E2E6EA] truncate max-w-48">
                     {sample.sample_id}
                   </td>
 
@@ -233,25 +260,25 @@ export default function MutationMatrix({
                     return (
                       <td
                         key={mut.id}
-                        className="p-1 border-r border-slate-100 text-center"
+                        className="p-1 border-r border-[#E2E6EA] last:border-r-0 text-center"
                         onMouseEnter={() => setHoveredCell({ sampleId: sample.sample_id, mut, cell, isLowCov })}
                         onMouseLeave={() => setHoveredCell(null)}
                       >
                         <div
-                          className={`mx-auto w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-150 ${
+                          className={`mx-auto w-8 h-8 rounded-[4px] flex items-center justify-center transition-colors font-mono tabular-nums ${
                             hasMut
                               ? isHighFreq
-                                ? 'bg-red-600 text-white font-bold scale-95 border border-red-700'
-                                : 'bg-red-100 text-red-700 border border-red-300 font-semibold scale-95'
+                                ? 'bg-[#0F5C6E] text-white font-semibold border border-[#0B4654]'
+                                : 'bg-[#D4E8ED] text-[#0B4654] border border-dashed border-[#0F5C6E] font-semibold'
                               : isLowCov
-                              ? 'bg-slate-200 border border-slate-300 text-slate-600 scale-90'
-                              : 'bg-white border border-slate-200 hover:border-slate-400'
+                              ? 'bg-[#E5E7EB] border border-[#CBD2D9] text-[#4B5563]'
+                              : 'bg-white border border-[#E2E6EA] hover:border-[#0F5C6E]'
                           }`}
                         >
                           {hasMut ? (
-                            <span className="text-[10px] font-mono">{Math.round(cell.frequency * 100)}</span>
+                            <span className="text-[10px]">{Math.round(cell.frequency * 100)}</span>
                           ) : isLowCov ? (
-                            <span className="text-[9px] font-mono font-bold">N</span>
+                            <span className="text-[10px] font-bold">N</span>
                           ) : null}
                         </div>
                       </td>
@@ -265,92 +292,70 @@ export default function MutationMatrix({
       )}
 
       {passingSamples.length > 0 && sortedMutations.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-          <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl min-h-20">
-            {hoveredCell ? (
-              <div className="flex flex-col gap-1">
-                <span className="text-[10px] text-slate-500 font-mono">{hoveredCell.sampleId}</span>
-                <div className="flex flex-wrap items-center gap-2 mt-0.5">
-                  <span className="text-sm font-bold text-slate-900 font-mono">
-                    g.{hoveredCell.mut.position}{hoveredCell.mut.ref}&gt;{hoveredCell.mut.alt}
+        <div className="px-3.5 py-2.5 bg-[#F8F9FA] border border-[#E2E6EA] rounded-[4px] min-h-[42px] flex flex-wrap items-center justify-between gap-2 text-xs">
+          {hoveredCell ? (
+            <>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-semibold text-[#111827]">{hoveredCell.sampleId}</span>
+                <span className="text-[#CBD2D9]">·</span>
+                <span className="font-mono font-semibold text-[#111827]">
+                  g.{hoveredCell.mut.position}{hoveredCell.mut.ref}&gt;{hoveredCell.mut.alt}
+                </span>
+                <span className="text-[10px] bg-white text-[#4B5563] border border-[#E2E6EA] font-mono px-1.5 py-0.5 rounded-[4px]">
+                  {hoveredCell.mut.gene}
+                </span>
+                {hoveredCell.mut.consequences.map((c, cIdx) => (
+                  <span
+                    key={cIdx}
+                    className={`text-[10px] font-mono px-1.5 py-0.5 rounded-[4px] border ${
+                      c.kind === 'unavailable' || c.kind === 'synonymous'
+                        ? 'bg-[#F1F3F5] text-[#5C6773] border-[#E2E6EA]'
+                        : c.kind === 'frameshift' || c.kind === 'indel'
+                        ? 'bg-[#FDF6E7] text-[#9A5B06] border-[#EBD29B] font-semibold'
+                        : 'bg-[#FCEEEB] text-[#B43B2E] border-[#EBBDB8] font-semibold'
+                    }`}
+                  >
+                    {hoveredCell.mut.consequences.length > 1 ? `${c.gene}: ` : ''}
+                    {c.label}
                   </span>
-                  <span className="text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-200 font-bold px-1.5 py-0.5 rounded">
-                    {hoveredCell.mut.gene}
+                ))}
+              </div>
+              {hoveredCell.cell ? (
+                <div className="flex items-center gap-3 font-mono tabular-nums text-[#4B5563]">
+                  <span>
+                    Allele Freq: <strong className="text-[#0F5C6E]">{(hoveredCell.cell.frequency * 100).toFixed(1)}%</strong>
                   </span>
-                  {hoveredCell.mut.consequences.map((c, cIdx) => (
-                    <span
-                      key={cIdx}
-                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
-                        c.kind === 'unavailable' || c.kind === 'synonymous'
-                          ? 'bg-slate-100 text-slate-500 border-slate-200'
-                          : c.kind === 'frameshift' || c.kind === 'indel'
-                          ? 'bg-amber-50 text-amber-700 border-amber-200'
-                          : 'bg-red-50 text-red-700 border-red-200'
-                      }`}
-                    >
-                      {hoveredCell.mut.consequences.length > 1 ? `${c.gene}: ` : ''}
-                      {c.label}
-                    </span>
-                  ))}
+                  <span>
+                    Depth: <strong className="text-[#111827]">{formatDepth(hoveredCell.cell.depth, { decimals: 0 })}</strong>
+                  </span>
                 </div>
-                {hoveredCell.cell ? (
-                  <div className="flex items-center gap-4 text-xs mt-1 text-slate-700">
-                    <span>Allele Freq: <strong className="text-red-600 font-mono">{(hoveredCell.cell.frequency * 100).toFixed(1)}%</strong></span>
-                    <span>Depth: <strong className="text-slate-900 font-mono">{hoveredCell.cell.depth}x</strong></span>
-                  </div>
-                ) : hoveredCell.isLowCov ? (
-                  <div className="text-xs mt-1 text-red-600 font-medium">
-                    Low Coverage / Masked &apos;N&apos; at ref position {hoveredCell.mut.position} (&lt;{minCoverageThreshold}x depth)
-                  </div>
-                ) : (
-                  <div className="text-xs mt-1 text-emerald-700 font-medium">
-                    Wild Type Reference Allele ({hoveredCell.mut.ref}) &ge;{minCoverageThreshold}x covered
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 text-slate-500 text-xs h-full py-2 justify-center">
-                <HelpCircle className="w-4 h-4 text-red-600" />
-                <span>Hover over grid cells to inspect indel-safe reference coverage and allele frequency</span>
-              </div>
-            )}
-          </div>
-
-          <div className="flex flex-wrap gap-4 justify-start md:justify-end text-xs text-slate-600">
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded bg-red-600 border border-red-700" />
-              <span>Clonal (&ge;{clonalAfPct}%)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded bg-red-100 border border-red-300" />
-              <span>Subclonal (&lt;{clonalAfPct}%)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded bg-white border border-slate-300" />
-              <span>Reference Match</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded bg-slate-200 border border-slate-300 flex items-center justify-center text-[9px] font-mono text-slate-700 font-bold">
-                N
-              </div>
-              <span>Low Coverage (&lt;{minCoverageThreshold}x)</span>
-            </div>
-          </div>
+              ) : hoveredCell.isLowCov ? (
+                <span className="text-[#A62C22] font-medium">
+                  Masked &apos;N&apos; at ref position {hoveredCell.mut.position} (&lt;{minCoverageThreshold}x depth)
+                </span>
+              ) : (
+                <span className="text-[#16654A] font-medium">
+                  Wild-type reference allele ({hoveredCell.mut.ref}) &ge;{minCoverageThreshold}x covered
+                </span>
+              )}
+            </>
+          ) : (
+            <span className="text-[#6B7280]">
+              Hover over any matrix cell to inspect indel-safe reference coverage, depth, and allele frequency.
+            </span>
+          )}
         </div>
       )}
 
       {excludedSamples.length > 0 && (
-        <div className="border border-slate-200 bg-slate-50 rounded-xl p-4 flex flex-col gap-2">
-          <span className="text-xs font-semibold text-red-700 tracking-wider block">
+        <div className="border border-[#E2E6EA] bg-[#F8F9FA] rounded-[4px] px-4 py-3 flex flex-col gap-1.5">
+          <span className="text-xs font-semibold text-[#A62C22]">
             Excluded Low-Coverage Samples (&lt;{minBreadthCutoff}% Breadth at &ge;{minCoverageThreshold}x)
           </span>
-          <p className="text-[11px] text-slate-600">
-            Samples below the breadth threshold are excluded from matrix comparisons:
-          </p>
-          <div className="flex flex-wrap gap-2 mt-1">
+          <div className="flex flex-wrap gap-2">
             {excludedSamples.map(({ sample, breadth }) => (
-              <span key={sample.sample_id} className="text-[11px] bg-white border border-slate-200 text-slate-700 font-mono px-2.5 py-1 rounded-lg">
-                {sample.sample_id}: <strong className="text-red-600">{breadth.toFixed(1)}% cov</strong>
+              <span key={sample.sample_id} className="text-[11px] bg-white border border-[#E2E6EA] text-[#111827] font-mono px-2.5 py-1 rounded-[4px] tabular-nums">
+                {sample.sample_id}: <strong className="text-[#A62C22]">{breadth.toFixed(1)}% cov</strong>
               </span>
             ))}
           </div>

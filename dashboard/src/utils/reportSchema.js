@@ -383,3 +383,48 @@ export function formatConsequences(variant) {
     },
   ];
 }
+
+/**
+ * Collapses duplicate consequence records (e.g. overlapping ORF1ab/ORF1a isoforms)
+ * sharing the exact same AA label and effect kind while preserving gene attribution.
+ */
+export function deduplicateConsequences(consequences) {
+  if (!Array.isArray(consequences) || consequences.length === 0) return [];
+  const grouped = new Map();
+  consequences.forEach((c) => {
+    const key = `${c.kind || 'unknown'}::${c.label || ''}`;
+    if (!grouped.has(key)) {
+      grouped.set(key, {
+        ...c,
+        genes: c.gene ? [c.gene] : [],
+        products: c.product ? [c.product] : [],
+      });
+    } else {
+      const existing = grouped.get(key);
+      if (c.gene && !existing.genes.includes(c.gene)) {
+        existing.genes.push(c.gene);
+      }
+      if (c.product && !existing.products.includes(c.product)) {
+        existing.products.push(c.product);
+      }
+    }
+  });
+  return [...grouped.values()].map((item) => ({
+    ...item,
+    gene: item.genes.length > 0 ? item.genes.join('/') : item.gene || 'Unknown',
+    tooltip: [item.genes.join('/'), ...item.products, item.status, item.effect].filter(Boolean).join(' · '),
+  }));
+}
+
+/**
+ * Formats sequencing depth values consistently across overview tables, tooltips, and reports.
+ */
+export function formatDepth(val, { decimals = 1 } = {}) {
+  if (val === null || val === undefined || typeof val === 'boolean') return 'N/A';
+  const num = Number(val);
+  if (Number.isNaN(num)) return 'N/A';
+  return `${num.toLocaleString(undefined, {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  })}x`;
+}

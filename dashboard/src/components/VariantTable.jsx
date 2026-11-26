@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, Download, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
-import { formatConsequences, formatMetric } from '../utils/reportSchema';
+import { deduplicateConsequences, formatConsequences, formatDepth, formatMetric } from '../utils/reportSchema';
 import { formatVariantsCsv, triggerBrowserDownload } from '../utils/exporters';
 
 export default function VariantTable({ variants, sampleId }) {
@@ -19,8 +19,10 @@ export default function VariantTable({ variants, sampleId }) {
 
   if (!variants || variants.length === 0) {
     return (
-      <div className="p-8 text-center text-slate-500 glass-panel rounded-2xl">
-        <p>No variants identified for sample <strong className="text-slate-900">{sampleId}</strong>.</p>
+      <div className="p-8 text-center text-[#6B7280] glass-panel text-[13px]">
+        <p>
+          No variants identified for sample <strong className="text-[#111827]">{sampleId}</strong>.
+        </p>
       </div>
     );
   }
@@ -28,10 +30,12 @@ export default function VariantTable({ variants, sampleId }) {
   const uniqueGenes = [
     'ALL',
     ...new Set(
-      variants.flatMap((v) => {
-        const cons = formatConsequences(v);
-        return cons.length > 0 ? cons.map((c) => c.gene) : [v.gene];
-      }).filter(Boolean)
+      variants
+        .flatMap((v) => {
+          const cons = formatConsequences(v);
+          return cons.length > 0 ? cons.map((c) => c.gene) : [v.gene];
+        })
+        .filter(Boolean)
     ),
   ];
 
@@ -59,10 +63,7 @@ export default function VariantTable({ variants, sampleId }) {
       cons.some((c) => `${c.gene} ${c.label}`.toLowerCase().includes(q)) ||
       `${v.ref}>${v.alt}`.toLowerCase().includes(q);
 
-    const matchesGene =
-      geneFilter === 'ALL' ||
-      v.gene === geneFilter ||
-      cons.some((c) => c.gene === geneFilter);
+    const matchesGene = geneFilter === 'ALL' || v.gene === geneFilter || cons.some((c) => c.gene === geneFilter);
     const matchesType = typeFilter === 'ALL' || v.type === typeFilter;
 
     return matchesSearch && matchesGene && matchesType;
@@ -96,18 +97,18 @@ export default function VariantTable({ variants, sampleId }) {
   };
 
   return (
-    <div className="p-6 glass-panel rounded-2xl flex flex-col gap-6">
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+    <div className="p-5 glass-panel flex flex-col gap-5">
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
         <div>
-          <h3 className="text-lg font-semibold text-slate-900">Variant Call Details</h3>
-          <p className="text-xs text-slate-500">
+          <h3 className="text-[16px] font-semibold text-[#111827]">Variant Call Details</h3>
+          <p className="text-[12px] text-[#6B7280] mt-0.5">
             High-confidence SNPs &amp; indels computed from FORMAT/AD &amp; FORMAT/DP with consensus/subclonal status
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
           <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+            <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-[#6B7280]" />
             <input
               type="text"
               placeholder="Search pos, gene, AA..."
@@ -116,19 +117,19 @@ export default function VariantTable({ variants, sampleId }) {
                 setSearchTerm(e.target.value);
                 setCurrentPage(1);
               }}
-              className="pl-9 pr-4 py-2 w-48 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-red-500 transition-all"
+              className="pl-8 pr-3 py-1.5 w-48 text-xs rounded-[4px] bg-white border border-[#CBD2D9] text-[#111827] placeholder-[#6B7280] focus:outline-none focus:border-[#0F5C6E]"
             />
           </div>
 
-          <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5">
-            <Filter className="w-3.5 h-3.5 text-red-600" />
+          <div className="flex items-center gap-1.5 bg-white border border-[#CBD2D9] rounded-[4px] px-2.5 py-1.5">
+            <Filter className="w-3.5 h-3.5 text-[#0F5C6E]" />
             <select
               value={geneFilter}
               onChange={(e) => {
                 setGeneFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="text-xs bg-transparent text-slate-700 focus:outline-none border-none cursor-pointer"
+              className="text-xs bg-transparent text-[#111827] focus:outline-none border-none cursor-pointer"
             >
               {uniqueGenes.map((g) => (
                 <option key={g} value={g}>
@@ -144,7 +145,7 @@ export default function VariantTable({ variants, sampleId }) {
               setTypeFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="text-xs bg-slate-50 border border-slate-200 text-slate-700 rounded-xl px-3 py-1.5 focus:outline-none cursor-pointer"
+            className="text-xs bg-white border border-[#CBD2D9] text-[#111827] rounded-[4px] px-2.5 py-1.5 focus:outline-none focus:border-[#0F5C6E] cursor-pointer"
           >
             <option value="ALL">All Types</option>
             <option value="Coding">Coding Only</option>
@@ -153,7 +154,7 @@ export default function VariantTable({ variants, sampleId }) {
 
           <button
             onClick={exportToCSV}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white text-xs font-semibold rounded-xl hover:bg-red-700 active:scale-95 transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0F5C6E] hover:bg-[#0B4654] text-white text-xs font-semibold rounded-[4px] transition-colors whitespace-nowrap"
           >
             <Download className="w-3.5 h-3.5" />
             Export CSV
@@ -161,35 +162,40 @@ export default function VariantTable({ variants, sampleId }) {
         </div>
       </div>
 
-      <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white max-w-full">
-        <table className="w-full text-left text-xs border-collapse">
+      <div className="overflow-x-auto border border-[#E2E6EA] rounded-[6px] bg-white max-w-full">
+        <table className="w-full text-left text-[13px] border-collapse">
           <thead>
-            <tr className="border-b border-slate-200 text-slate-700 bg-slate-100">
-              <th className="p-3.5 cursor-pointer hover:text-slate-900" onClick={() => handleSort('position')}>
-                <div className="flex items-center gap-1.5">
-                  Position <ArrowUpDown className="w-3 h-3 text-red-600" />
+            <tr className="border-b border-[#E2E6EA] text-[#4B5563] bg-[#F1F3F5] text-[11px] uppercase tracking-[0.04em] select-none">
+              <th className="px-3.5 py-2.5 cursor-pointer hover:text-[#111827] whitespace-nowrap" onClick={() => handleSort('position')}>
+                <div className="flex items-center gap-1">
+                  Position
+                  <ArrowUpDown className={`w-3 h-3 ${sortField === 'position' ? 'text-[#0F5C6E]' : 'text-[#9CA3AF]'}`} />
                 </div>
               </th>
-              <th className="p-3.5">Allele &amp; Consequence</th>
-              <th className="p-3.5 cursor-pointer hover:text-slate-900" onClick={() => handleSort('gene')}>
-                <div className="flex items-center gap-1.5">
-                  Gene Region <ArrowUpDown className="w-3 h-3 text-red-600" />
+              <th className="px-3.5 py-2.5">Allele &amp; Consequence</th>
+              <th className="px-3.5 py-2.5 cursor-pointer hover:text-[#111827] whitespace-nowrap" onClick={() => handleSort('gene')}>
+                <div className="flex items-center gap-1">
+                  Gene Region
+                  <ArrowUpDown className={`w-3 h-3 ${sortField === 'gene' ? 'text-[#0F5C6E]' : 'text-[#9CA3AF]'}`} />
                 </div>
               </th>
-              <th className="p-3.5">Class / Consensus</th>
-              <th className="p-3.5 cursor-pointer hover:text-slate-900 text-right" onClick={() => handleSort('depth')}>
-                <div className="flex items-center justify-end gap-1.5">
-                  Depth <ArrowUpDown className="w-3 h-3 text-red-600" />
+              <th className="px-3.5 py-2.5 whitespace-nowrap">Class / Consensus</th>
+              <th className="px-3.5 py-2.5 cursor-pointer hover:text-[#111827] text-right whitespace-nowrap" onClick={() => handleSort('depth')}>
+                <div className="flex items-center justify-end gap-1">
+                  Depth
+                  <ArrowUpDown className={`w-3 h-3 ${sortField === 'depth' ? 'text-[#0F5C6E]' : 'text-[#9CA3AF]'}`} />
                 </div>
               </th>
-              <th className="p-3.5 cursor-pointer hover:text-slate-900 text-right" onClick={() => handleSort('frequency')}>
-                <div className="flex items-center justify-end gap-1.5">
-                  Allele Freq <ArrowUpDown className="w-3 h-3 text-red-600" />
+              <th className="px-3.5 py-2.5 cursor-pointer hover:text-[#111827] text-right whitespace-nowrap" onClick={() => handleSort('frequency')}>
+                <div className="flex items-center justify-end gap-1">
+                  Allele Freq
+                  <ArrowUpDown className={`w-3 h-3 ${sortField === 'frequency' ? 'text-[#0F5C6E]' : 'text-[#9CA3AF]'}`} />
                 </div>
               </th>
-              <th className="p-3.5 cursor-pointer hover:text-slate-900 text-right" onClick={() => handleSort('quality')}>
-                <div className="flex items-center justify-end gap-1.5">
-                  Quality <ArrowUpDown className="w-3 h-3 text-red-600" />
+              <th className="px-3.5 py-2.5 cursor-pointer hover:text-[#111827] text-right whitespace-nowrap" onClick={() => handleSort('quality')}>
+                <div className="flex items-center justify-end gap-1">
+                  Quality
+                  <ArrowUpDown className={`w-3 h-3 ${sortField === 'quality' ? 'text-[#0F5C6E]' : 'text-[#9CA3AF]'}`} />
                 </div>
               </th>
             </tr>
@@ -197,36 +203,36 @@ export default function VariantTable({ variants, sampleId }) {
           <tbody>
             {paginatedVariants.length > 0 ? (
               paginatedVariants.map((v, idx) => {
-                const cons = formatConsequences(v);
+                const dedupCons = deduplicateConsequences(formatConsequences(v));
                 return (
-                  <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                    <td className="p-3.5 font-mono font-medium text-slate-900">
+                  <tr key={idx} className="border-b border-[#E2E6EA] last:border-none hover:bg-[#F8F9FA] transition-colors">
+                    <td className="px-3.5 py-2.5 font-mono font-medium text-[#111827] whitespace-nowrap">
                       {v.position.toLocaleString()}
                     </td>
-                    <td className="p-3.5 font-mono">
+                    <td className="px-3.5 py-2.5 font-mono">
                       <div className="flex flex-col gap-1">
-                        <div>
-                          <span className="text-slate-500">{v.ref}</span>
-                          <span className="text-indigo-600 font-bold mx-1.5">&gt;</span>
-                          <span className="text-red-600 font-bold">{v.alt}</span>
+                        <div className="whitespace-nowrap">
+                          <span className="text-[#6B7280]">{v.ref}</span>
+                          <span className="text-[#9CA3AF] font-semibold mx-1">&gt;</span>
+                          <span className="text-[#0F5C6E] font-bold">{v.alt}</span>
                         </div>
-                        {cons.length > 0 && (
+                        {dedupCons.length > 0 && (
                           <div className="flex flex-wrap gap-1">
-                            {cons.map((c, cIdx) => (
+                            {dedupCons.map((c, cIdx) => (
                               <span
                                 key={cIdx}
-                                title={c.product || c.status || c.effect}
-                                className={`text-[10px] px-1.5 py-0.5 rounded ${
+                                title={c.tooltip || c.label}
+                                className={`text-[11px] px-1.5 py-0.5 rounded-[4px] border ${
                                   c.kind === 'unavailable'
-                                    ? 'bg-slate-100 text-slate-500 italic'
+                                    ? 'bg-[#F1F3F5] text-[#6B7280] border-[#E2E6EA] italic'
                                     : c.kind === 'synonymous'
-                                    ? 'bg-slate-100 text-slate-500'
+                                    ? 'bg-[#F1F3F5] text-[#5C6773] border-[#E2E6EA]'
                                     : c.kind === 'frameshift' || c.kind === 'indel'
-                                    ? 'bg-amber-50 text-amber-700 font-semibold'
-                                    : 'bg-red-50 text-red-700 font-bold'
+                                    ? 'bg-[#FDF6E7] text-[#9A5B06] border-[#EBD29B] font-semibold'
+                                    : 'bg-[#FCEEEB] text-[#B43B2E] border-[#EBBDB8] font-semibold'
                                 }`}
                               >
-                                {cons.length > 1 ? `${c.gene}: ` : ''}
+                                {dedupCons.length > 1 ? `${c.gene}: ` : ''}
                                 {c.label}
                               </span>
                             ))}
@@ -234,36 +240,40 @@ export default function VariantTable({ variants, sampleId }) {
                         )}
                       </div>
                     </td>
-                    <td className="p-3.5">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                    <td className="px-3.5 py-2.5 whitespace-nowrap">
+                      <span className="px-2 py-0.5 rounded-[4px] text-[11px] font-semibold bg-[#F1F3F5] text-[#111827] border border-[#E2E6EA] font-mono">
                         {v.gene}
                       </span>
                     </td>
-                    <td className="p-3.5">
-                      <div className="flex flex-wrap gap-1.5 items-center">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] border font-medium ${
-                          v.type === 'Coding'
-                            ? 'bg-red-50 text-red-700 border-red-200'
-                            : 'bg-slate-100 text-slate-600 border-slate-200'
-                        }`}>
+                    <td className="px-3.5 py-2.5 whitespace-nowrap">
+                      <div className="flex items-center gap-1.5">
+                        <span className="px-2 py-0.5 rounded-[4px] text-[11px] border font-medium bg-[#F8F9FA] text-[#4B5563] border-[#E2E6EA]">
                           {v.type}
                         </span>
                         {v.is_consensus !== undefined && (
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                            v.is_consensus
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                              : 'bg-amber-50 text-amber-700 border border-amber-200'
-                          }`}>
+                          <span
+                            className={`px-2 py-0.5 rounded-[4px] text-[11px] font-semibold ${
+                              v.is_consensus
+                                ? 'bg-[#EAF3F5] text-[#0B4654] border border-[#B9D6DD]'
+                                : 'bg-white text-[#0B4654] border border-dashed border-[#0F5C6E]'
+                            }`}
+                          >
                             {v.is_consensus ? 'Consensus' : 'Subclonal'}
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="p-3.5 font-mono text-right text-slate-700">{v.depth}x</td>
-                    <td className="p-3.5 font-mono text-right text-red-600 font-semibold">
+                    <td className="px-3.5 py-2.5 font-mono text-right text-[#111827] whitespace-nowrap">
+                      {formatDepth(v.depth, { decimals: 0 })}
+                    </td>
+                    <td
+                      className={`px-3.5 py-2.5 font-mono text-right font-semibold whitespace-nowrap ${
+                        v.is_consensus === false ? 'text-[#4B5563]' : 'text-[#0F5C6E]'
+                      }`}
+                    >
                       {(v.frequency * 100).toFixed(1)}%
                     </td>
-                    <td className="p-3.5 font-mono text-right text-slate-700">
+                    <td className="px-3.5 py-2.5 font-mono text-right text-[#4B5563] whitespace-nowrap">
                       {formatMetric(v.quality, { decimals: 1 })}
                     </td>
                   </tr>
@@ -271,7 +281,7 @@ export default function VariantTable({ variants, sampleId }) {
               })
             ) : (
               <tr>
-                <td colSpan="7" className="p-8 text-center text-slate-500 font-medium">
+                <td colSpan="7" className="p-8 text-center text-[#6B7280] font-medium">
                   No variants found matching the filters.
                 </td>
               </tr>
@@ -281,12 +291,12 @@ export default function VariantTable({ variants, sampleId }) {
       </div>
 
       {sortedVariants.length > 0 && (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-slate-200 pt-4 text-xs text-slate-500">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-[#E2E6EA] pt-3.5 text-xs text-[#6B7280] tabular-nums">
           <div className="flex flex-wrap items-center gap-4">
             <span>
-              Showing <strong className="text-slate-900">{startIndex + 1}</strong> to{' '}
-              <strong className="text-slate-900">{Math.min(startIndex + currentItemsPerPage, sortedVariants.length)}</strong> of{' '}
-              <strong className="text-slate-900">{sortedVariants.length}</strong> variants
+              Showing <strong className="text-[#111827]">{startIndex + 1}</strong> to{' '}
+              <strong className="text-[#111827]">{Math.min(startIndex + currentItemsPerPage, sortedVariants.length)}</strong> of{' '}
+              <strong className="text-[#111827]">{sortedVariants.length}</strong> variants
             </span>
 
             <div className="flex items-center gap-1.5">
@@ -298,7 +308,7 @@ export default function VariantTable({ variants, sampleId }) {
                   setItemsPerPage(val === 'ALL' ? 'ALL' : Number(val));
                   setCurrentPage(1);
                 }}
-                className="bg-slate-50 border border-slate-200 text-slate-800 text-[11px] rounded-lg px-2 py-0.5 focus:outline-none cursor-pointer"
+                className="bg-white border border-[#CBD2D9] text-[#111827] text-[11px] rounded-[4px] px-2 py-0.5 focus:outline-none focus:border-[#0F5C6E] cursor-pointer"
               >
                 <option value={10}>10</option>
                 <option value={50}>50</option>
@@ -313,18 +323,18 @@ export default function VariantTable({ variants, sampleId }) {
               <button
                 onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
                 disabled={currentPage === 1}
-                className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="p-1.5 rounded-[4px] border border-[#CBD2D9] bg-white text-[#111827] hover:border-[#0F5C6E] disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <span className="px-2">
-                Page <strong className="text-slate-900">{currentPage}</strong> of{' '}
-                <strong className="text-slate-900">{totalPages}</strong>
+                Page <strong className="text-[#111827]">{currentPage}</strong> of{' '}
+                <strong className="text-[#111827]">{totalPages}</strong>
               </span>
               <button
                 onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
                 disabled={currentPage === totalPages}
-                className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="p-1.5 rounded-[4px] border border-[#CBD2D9] bg-white text-[#111827] hover:border-[#0F5C6E] disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
