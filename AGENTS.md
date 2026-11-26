@@ -19,7 +19,7 @@ Viromics is an integrated genomic epidemiology platform for viral amplicon whole
   5. Distance matrix calculation, deletion masking, or NJ/UPGMA tree clustering logic.
   6. Output directory layout, file naming conventions, or `viromics_run_report.json` schema.
   7. Dashboard views, components, or feature tabs in `dashboard/src/`.
-- **Action Required**: Immediately review and update the corresponding sections, tables, code snippets, and interactive command generator in [`wiki.html`](file:///Users/johnsebastiane/Projects/Viromics/wiki.html).
+- **Action Required**: Immediately review and update the corresponding sections, tables, code snippets, and interactive command generator in [`wiki.html`](wiki.html).
 
 ---
 
