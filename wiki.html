@@ -1007,6 +1007,24 @@ npm run build
           <pre><code>nextflow run pipeline/main.nf   --platform illumina   --sample_sheet example_data/illumina_SARS2/samplesheet.csv   --reference example_data/illumina_SARS2/refs/ref.SARS-CoV-2.fasta   --gff example_data/illumina_SARS2/refs/ref.SARS-CoV-2.gff   --primer_bed example_data/illumina_SARS2/refs/primer_scheme.SARS-CoV-2-Eden.bed   --metadata example_data/illumina_SARS2/metadata.csv   --outdir results/illumina_sars2   -profile conda</code></pre>
         </div>
 
+        <p>Viromics also includes a scrubbed, deterministically downsampled (<code>~300x</code> depth) Oxford Nanopore RSV multi-strain dataset in <code>example_data/ont_RSV/</code> (<code>NC_038235.1_RSV-A</code> and <code>NC_001781.1_RSV-B</code>):</p>
+        <div class="code-container">
+          <div class="code-header">
+            <span>BASH — Run RSV Oxford Nanopore Example</span>
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code>nextflow run pipeline/main.nf \
+  --platform ont \
+  --sample_sheet example_data/ont_RSV/samplesheet.csv \
+  --reference example_data/ont_RSV/refs/ref.RSV.fasta \
+  --gff example_data/ont_RSV/refs/ref.RSV.gff \
+  --primer_bed example_data/ont_RSV/refs/primer_scheme.RSV-Eden.bed \
+  --amplicons_bed example_data/ont_RSV/refs/amplicons.RSV-Eden.bed \
+  --metadata example_data/ont_RSV/metadata.csv \
+  --outdir example_data/ont_RSV/results \
+  -profile conda</code></pre>
+        </div>
+
         <p>Once finished, launch the dashboard or preview the output report:</p>
         <div class="code-container">
           <div class="code-header">

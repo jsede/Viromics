@@ -69,6 +69,13 @@ def main():
     point2_passed = True
     reference_names = [ref["name"] for ref in r["references"]]
     print(f"References in report: {reference_names}")
+    expected_refs = {"NC_038235.1_RSV-A", "NC_001781.1_RSV-B"}
+    if not expected_refs.issubset(set(reference_names)):
+        print(
+            f"Point 2 Fail: Expected renamed RSV references {sorted(expected_refs)}, got {reference_names}",
+            file=sys.stderr,
+        )
+        point2_passed = False
 
     for s in r["samples"]:
         s_id = s["sample_id"]

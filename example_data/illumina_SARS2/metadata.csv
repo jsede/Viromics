@@ -1,0 +1,5 @@
+sample_id,collection_date,location,host,type
+NTC,2026,Australia,Control,Control
+Sample01,2026,Australia,Human,Clinical
+Sample02,2026,Australia,Human,Clinical
+Sample03,2026,Australia,Human,Clinical

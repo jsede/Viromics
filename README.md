@@ -191,6 +191,30 @@ This execution:
 
 ---
 
+## Running the RSV Oxford Nanopore Example Dataset
+
+The repository also includes a scrubbed, deterministically downsampled (`~300x` mean depth per sample) Oxford Nanopore RSV amplicon dataset inside `example_data/ont_RSV/`, featuring multi-strain co-detection references (`NC_038235.1_RSV-A` and `NC_001781.1_RSV-B`):
+
+```bash
+nextflow run pipeline/main.nf \
+  --platform ont \
+  --sample_sheet example_data/ont_RSV/samplesheet.csv \
+  --reference example_data/ont_RSV/refs/ref.RSV.fasta \
+  --gff example_data/ont_RSV/refs/ref.RSV.gff \
+  --primer_bed example_data/ont_RSV/refs/primer_scheme.RSV-Eden.bed \
+  --amplicons_bed example_data/ont_RSV/refs/amplicons.RSV-Eden.bed \
+  --metadata example_data/ont_RSV/metadata.csv \
+  --outdir example_data/ont_RSV/results \
+  -profile conda
+```
+
+Validate the generated report against schema `v2.0.0` and VCF decoupling invariants with:
+```bash
+python3 pipeline/bin/sanity_check_rsv.py example_data/ont_RSV/results
+```
+
+---
+
 ## Local Development & Testing
 
 To test the dashboard visualizations without executing NGS runs, generate synthetic multi-strain datasets:

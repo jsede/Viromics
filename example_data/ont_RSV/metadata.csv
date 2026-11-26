@@ -1,0 +1,6 @@
+sample_id,collection_date,location,host,type,subtype
+Sample13,2023,Australia,Human,Clinical,RSV-B
+Sample29,2023,Australia,Human,Clinical,RSV-A
+Sample35,2023,Australia,Human,Clinical,RSV-A
+Sample40,2023,Australia,Human,Clinical,RSV-B
+Sample45,2023,Australia,Human,Clinical,RSV-B

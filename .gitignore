@@ -12,7 +12,7 @@ results/
 runs/
 test_*_results*/
 dashboard/public/run_*_report.json
-example_data/ont_RSV/input/*.fastq.gz
+example_data/*/results/
 *.fai
 
 # Production build outputs
