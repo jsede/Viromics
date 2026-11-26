@@ -96,12 +96,12 @@ jobs:
 
       - name: CLI help & negative parameter/samplesheet validation checks
         run: |
-          nextflow run pipeline/main.nf --help
-          if nextflow run pipeline/main.nf --min_cov 50; then
+          nextflow run pipeline/main.nf -ansi-log false --help
+          if nextflow run pipeline/main.nf -ansi-log false --min_cov 50; then
             echo "ERROR: Expected unknown parameter --min_cov to fail fast"
             exit 1
           fi
-          if nextflow run pipeline/main.nf --platform illumina --sample_sheet pipeline/test_data/samplesheet_ont.csv --reference pipeline/test_data/ref_synth.fasta; then
+          if nextflow run pipeline/main.nf -ansi-log false --platform illumina --sample_sheet pipeline/test_data/samplesheet_ont.csv --reference pipeline/test_data/ref_synth.fasta; then
             echo "ERROR: Expected conflicting samplesheet platform to fail fast"
             exit 1
           fi
@@ -112,6 +112,7 @@ jobs:
       - name: Run synthetic Illumina E2E + verify_e2e + -resume cache check
         run: |
           nextflow run pipeline/main.nf \
+            -ansi-log false \
             --platform illumina \
             --sample_sheet pipeline/test_data/samplesheet_illumina.csv \
             --reference pipeline/test_data/ref_synth.fasta \
@@ -129,7 +130,9 @@ jobs:
             --primer-bed pipeline/test_data/primers_synth.bed \
             --require-jsonschema
 
+          rm -f ci_resume_trace.txt
           nextflow run pipeline/main.nf \
+            -ansi-log false \
             --platform illumina \
             --sample_sheet pipeline/test_data/samplesheet_illumina.csv \
             --reference pipeline/test_data/ref_synth.fasta \
@@ -140,12 +143,58 @@ jobs:
             --max_cpus 2 \
             --max_memory 6.GB \
             --outdir ci_results_illumina \
-            -resume | tee resume_illumina.log
-          grep -Eq "cached:|Cached" resume_illumina.log
+            -resume \
+            -with-trace ci_resume_trace.txt
+
+          python - <<'PY'
+          import csv
+          import sys
+
+          expected_procs = {
+              "FASTQ_QC",
+              "INDEX_REFERENCE",
+              "ALIGN_READS",
+              "PRIMER_TRIM",
+              "VARIANT_CALL",
+              "CONSENSUS_GEN",
+              "AGGREGATE_METRICS",
+          }
+
+          with open("ci_resume_trace.txt", newline="", encoding="utf-8") as fh:
+              rows = list(csv.DictReader(fh, delimiter="\t"))
+
+          if not rows:
+              print("FAIL: ci_resume_trace.txt contains no task rows.", file=sys.stderr)
+              sys.exit(1)
+
+          non_cached = [
+              (r.get("name", "?"), r.get("status", "?"))
+              for r in rows
+              if r.get("status") != "CACHED"
+          ]
+          if non_cached:
+              print(f"FAIL: Non-cached tasks detected on -resume: {non_cached}", file=sys.stderr)
+              sys.exit(1)
+
+          seen_procs = {
+              r.get("name", "").split(" (", 1)[0].split(":")[-1].strip()
+              for r in rows
+          }
+          missing_procs = sorted(expected_procs - seen_procs)
+          if missing_procs:
+              print(
+                  f"FAIL: Missing expected processes in -resume trace: {missing_procs} (seen: {sorted(seen_procs)})",
+                  file=sys.stderr,
+              )
+              sys.exit(1)
+
+          print(f"PASS: All {len(rows)} tasks across all {len(expected_procs)} processes had status == 'CACHED'.")
+          PY
 
       - name: Run synthetic ONT E2E + verify_e2e
         run: |
           nextflow run pipeline/main.nf \
+            -ansi-log false \
             --platform ont \
             --sample_sheet pipeline/test_data/samplesheet_ont.csv \
             --reference pipeline/test_data/ref_synth.fasta \

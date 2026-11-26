@@ -209,3 +209,9 @@ To test the dashboard visualizations without executing NGS runs, generate synthe
    npm run dev
    ```
    Open [http://localhost:5173](http://localhost:5173), upload `mock_run_report.json` (or your pipeline's `viromics_run_report.json`), and interact with the comparative heatmaps, amplicon QC charts, genome maps, and phylogenetic trees.
+
+---
+
+## License
+
+Viromics is open-source software licensed under the [GNU General Public License v3.0](LICENSE) ([github.com/jsede/Viromics](https://github.com/jsede/Viromics)).
