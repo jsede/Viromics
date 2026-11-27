@@ -3,7 +3,9 @@
 An integrated suite for genomic epidemiology of viral pathogens. It combines a modular Nextflow (DSL2) analytical pipeline for amplicon-based whole-genome sequencing (WGS) with a client-side React web dashboard to explore quality control (QC), genome coverage depth, variant metrics, and evolutionary relationships.
 
 > [!TIP]
-> **Interactive Documentation Wiki**: Open [`wiki.html`](wiki.html) in your browser (or run `open wiki.html` on macOS) for an interactive technical wiki with parameter builders, curated frameshift model guides, tool details, and troubleshooting FAQs!
+> **Live Web App & Interactive Docs (Zero Local Install):**
+> - **Hosted Dashboard**: Open **[app.viromics.group](https://app.viromics.group)** and drag-and-drop `viromics_run_report.json` directly into your browser (100% client-side — no data is uploaded to any server).
+> - **Interactive Wiki & Command Builder**: Browse **[app.viromics.group/wiki.html](https://app.viromics.group/wiki.html)** (or open [`wiki.html`](wiki.html) offline) for parameter builders, curated frameshift model guides, tool details, and troubleshooting FAQs.
 
 ---
 
@@ -17,8 +19,8 @@ An integrated suite for genomic epidemiology of viral pathogens. It combines a m
 - **Epidemiological Distance & Schema Provenance**: Whole-genome SNP distance matrices (`distance_matrices`, `snp_distance_matrices`, `compared_sites_matrices`) emitting `null` for zero-overlap pairs, full `run_config` + `software_versions` provenance, parameter validation against [`nextflow_schema.json`](nextflow_schema.json), and report validation against [`schema/viromics_run_report.schema.json`](schema/viromics_run_report.schema.json).
 - **Reproducible Packaging & Synthetic CI**: Pinned [`pipeline/environment.yml`](pipeline/environment.yml) (`-profile conda` / `-profile micromamba`), unified [`Dockerfile`](Dockerfile) (`-profile docker` / `-profile singularity`), and a deterministic synthetic E2E test suite (`pipeline/test_data/` + `verify_e2e.py`).
 
-### React Web Dashboard
-- **Zero-Database, Schema-Driven Design**: Client-side application that dynamically consumes `viromics_run_report.json` (`v2.0.0` schema with `v1` fallback), adapting QC tiers, thresholds, run configuration, and software provenance automatically.
+### React Web Dashboard ([app.viromics.group](https://app.viromics.group))
+- **Zero-Database, Client-Side Web App**: Available immediately at **[https://app.viromics.group](https://app.viromics.group)** (with docs and Command Builder at **[https://app.viromics.group/wiki.html](https://app.viromics.group/wiki.html)**). Dynamically consumes `viromics_run_report.json` (`v2.0.0` schema with `v1` fallback) entirely in your browser, adapting QC tiers, thresholds, run configuration, and software provenance automatically.
 - **Dynamic Multi-Strain Visualization & Amplicon QC**: Adapts to multi-FASTA reference runs, flags co-detections, shades internal coverage dropouts, and visualizes per-amplicon depth and coverage tiers.
 - **Integrated Linear Genome Browser & Indel-Safe Matrix**: Multi-track staggered SVG gene map with exon connectors, interactive variant tables with structured `consequences[]`, and an indel-safe mutational sharing matrix powered by `low_coverage_intervals`.
 - **Midpoint-Rooted NJ & UPGMA Phylogenetics**: Defaults to Midpoint-Rooted Neighbor-Joining with an interactive UPGMA toggle, backed by whole-genome SNP distances, pairwise `compared_sites` overlap guards, and Newick/CSV/SVG/FASTA exports.
@@ -50,7 +52,7 @@ An integrated suite for genomic epidemiology of viral pathogens. It combines a m
 ### 1. Pre-requisites
 - **Nextflow** (&ge; 23.04; tested on v26+)
 - **Conda**, **Micromamba**, or **Docker** (or **Singularity**)
-- **Node.js** (v18+) and **npm**
+- **Node.js** (v18+) and **npm** *(optional — only needed for local dashboard development or offline builds; end-users can use [app.viromics.group](https://app.viromics.group))*
 
 ### 2. Container Execution (Docker / Singularity)
 `-profile docker` and `-profile singularity` pull the prebuilt image **`ghcr.io/jsede/viromics:2.0.2`** automatically from GitHub Container Registry (GHCR) — no manual build is required. Pass `--container_image <image_or_sif>` to pin a different tag, registry image, or local Singularity `.sif` file.
@@ -64,14 +66,16 @@ docker build -t viromics:2.0.2 .
 > [!NOTE]
 > If you prefer Conda or Micromamba instead of containers, pass `-profile conda` or `-profile micromamba` and Nextflow will provision the pinned environment from `pipeline/environment.yml` automatically.
 
-### 3. Dashboard Compilation
-Navigate to the `dashboard/` directory, install dependencies, and build the production bundle:
+### 3. Web Dashboard (Hosted or Local Build)
+Most users do **not** need Node.js or npm: simply open **[https://app.viromics.group](https://app.viromics.group)** and drop your `viromics_run_report.json` directly into the browser (all rendering and exports run 100% client-side).
+
+For local development or offline/air-gapped deployment, compile the production bundle inside `dashboard/`:
 ```bash
 cd dashboard
 npm install
 npm run build
 ```
-The optimized web application files will be written to `dashboard/dist/`.
+The optimized static bundle will be written to `dashboard/dist/`.
 
 ---
 
@@ -199,7 +203,7 @@ This execution:
 1. Parses the samplesheet `samplesheet.csv` to map the paired-end fastq files for the negative control (`NTC`) and three clinical samples (`Sample01`, `Sample02`, `Sample03`).
 2. Trims PCR primers dynamically and calls variants against the SARS-CoV-2 reference sequence.
 3. Incorporates collection dates, geographic locations, and specimen host metadata from `metadata.csv`.
-4. Runs the Python schema validator and outputs the consolidated run report at `example_data/illumina_SARS2/results/viromics_run_report.json`. Drag and drop this output report directly into the React dashboard to analyze the results!
+4. Runs the Python schema validator and outputs the consolidated run report at `example_data/illumina_SARS2/results/viromics_run_report.json`. Drag and drop this report directly into **[app.viromics.group](https://app.viromics.group)** (or your local dashboard) to analyze the results!
 
 ---
 

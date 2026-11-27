@@ -736,6 +736,26 @@
       transition: transform 0.2s;
     }
 
+    .btn-primary-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.375rem 0.75rem;
+      font-size: 12px;
+      font-weight: 600;
+      color: #FFFFFF;
+      background: var(--accent-primary);
+      border: 1px solid var(--accent-primary);
+      border-radius: 4px;
+      text-decoration: none;
+      transition: background 0.15s ease, border-color 0.15s ease;
+      white-space: nowrap;
+    }
+    .btn-primary-link:hover {
+      background: var(--accent-primary-hover);
+      border-color: var(--accent-primary-hover);
+    }
+
     /* Footer */
     footer {
       border-top: 1px solid var(--border-color);
@@ -796,6 +816,9 @@
         </span>
         <input type="text" id="wikiSearchInput" class="search-input" placeholder="Search parameters, tools, models..." oninput="handleWikiSearch(this.value)">
       </div>
+      <a href="https://app.viromics.group" target="_blank" rel="noopener noreferrer" class="btn-primary-link">
+        Launch Dashboard &nearr;
+      </a>
       <a href="https://github.com/jsede/Viromics" target="_blank" rel="noopener noreferrer" class="copy-btn" style="text-decoration:none;">
         GitHub &nearr;
       </a>
@@ -981,8 +1004,8 @@ docker build -t viromics:2.0.2 .
 # Then run with: -profile docker --container_image viromics:2.0.2</code></pre>
         </div>
 
-        <h3>2. Dashboard Compilation</h3>
-        <p>The React web dashboard is located in <code>dashboard/</code>. To compile the production web assets:</p>
+        <h3>2. Web Dashboard (Hosted or Local Build)</h3>
+        <p>End-users can drop <code>viromics_run_report.json</code> straight into the hosted dashboard at <a href="https://app.viromics.group" target="_blank" rel="noopener noreferrer"><strong>app.viromics.group</strong></a> with zero local Node.js setup (all analysis runs 100% client-side in your browser). For local development or offline deployment, compile the production assets from <code>dashboard/</code>:</p>
 
         <div class="code-container">
           <div class="code-header">
@@ -1683,7 +1706,7 @@ NTC,2026-03-15,Sydney,Control,None</code></pre>
       <!-- Section: Web Dashboard Guide -->
       <section id="dashboard-guide">
         <h2>14. Interactive Web Dashboard Guide</h2>
-        <p>The React web application is fully driven by <code>viromics_run_report.json</code> (v2.0.0 schema with graceful v1 fallback), reading <code>run_config</code>, <code>qc_thresholds</code>, and <code>software_versions</code> dynamically across 5 integrated analytical views:</p>
+        <p>Launch the hosted client-side dashboard at <a href="https://app.viromics.group" target="_blank" rel="noopener noreferrer"><strong>app.viromics.group</strong></a> (or run it locally from <code>dashboard/</code>). The React application is fully driven by <code>viromics_run_report.json</code> (v2.0.0 schema with graceful v1 fallback), reading <code>run_config</code>, <code>qc_thresholds</code>, and <code>software_versions</code> dynamically across 5 integrated analytical views:</p>
 
         <div class="card-grid">
           <div class="card">

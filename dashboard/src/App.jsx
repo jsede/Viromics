@@ -12,6 +12,7 @@ import {
   Printer,
   ArrowUpDown,
   Download,
+  BookOpen,
 } from 'lucide-react';
 
 import CoverageChart from './components/CoverageChart';
@@ -310,8 +311,11 @@ export default function App() {
                 <h1 className="text-[15px] font-bold text-[#111827] tracking-tight leading-none">
                   VIROMICS
                 </h1>
-                <span className="text-[10px] py-0.5 px-1.5 rounded-[4px] bg-[#EAF3F5] text-[#0B4654] border border-[#B9D6DD] font-semibold font-mono leading-none">
-                  v{reportData.schema_version || '1.0'}
+                <span
+                  className="text-[10px] py-0.5 px-1.5 rounded-[4px] bg-[#EAF3F5] text-[#0B4654] border border-[#B9D6DD] font-semibold font-mono leading-none"
+                  title={`Loaded report JSON schema v${reportData.schema_version || '1.0'}`}
+                >
+                  schema v{reportData.schema_version || '1.0'}
                 </span>
               </div>
               <p className="text-[11px] text-[#6B7280] leading-tight mt-0.5">
@@ -325,6 +329,17 @@ export default function App() {
               <span className="text-[#6B7280]">Run:</span>
               <strong className="text-[#111827] font-mono font-semibold">{reportData.run_id}</strong>
             </div>
+
+            <a
+              href="/wiki.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Open Viromics Technical Wiki & Command Builder"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white hover:bg-[#F3F5F7] border border-[#E2E6EA] text-xs text-[#374151] hover:text-[#111827] font-semibold rounded-[4px] transition-colors"
+            >
+              <BookOpen className="w-3.5 h-3.5 text-[#0F5C6E]" />
+              Wiki
+            </a>
 
             <label className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0F5C6E] hover:bg-[#0B4654] text-xs text-white font-semibold rounded-[4px] cursor-pointer transition-colors">
               <UploadCloud className="w-3.5 h-3.5" />
