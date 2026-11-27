@@ -55,7 +55,7 @@ def helpMessage() {
       --qc_warn_depth       QC WARN min mean depth on callable target (default: 25)
       --qc_warn_breadth     QC WARN min callable breadth % at min_coverage (default: 80.0)
       --qc_warn_max_n       QC WARN max internal N % (default: 10.0)
-      --container_image     Container image tag or Singularity .sif path (default: 'viromics:2.0.1')
+      --container_image     Container image tag or Singularity .sif path (default: 'ghcr.io/jsede/viromics:2.0.2')
       --max_cpus            Maximum CPUs permitted per process (default: 16)
       --max_memory          Maximum memory permitted per process (default: '32.GB')
       --max_time            Maximum wall-clock time permitted per process (default: '24.h')

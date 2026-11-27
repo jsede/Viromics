@@ -274,7 +274,7 @@
       "properties": {
         "container_image": {
           "type": "string",
-          "default": "viromics:2.0.1",
+          "default": "ghcr.io/jsede/viromics:2.0.2",
           "description": "Container image tag or Singularity .sif path used by -profile docker / -profile singularity."
         },
         "max_cpus": {

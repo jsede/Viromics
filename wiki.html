@@ -963,21 +963,22 @@
         </div>
 
         <h3>1. Pipeline Environment &amp; Container Setup (Conda / Micromamba / Docker / Singularity)</h3>
-        <p>The pipeline automatically provisions pinned bioinformatics tools from <code>pipeline/environment.yml</code> when executed with <code>-profile conda</code> or <code>-profile micromamba</code>, or runs inside the reproducible micromamba image (<code>Dockerfile</code>) via <code>-profile docker</code> or <code>-profile singularity</code>. Because <code>params.container_image</code> defaults to the local tag <code>viromics:2.0.1</code>, build the image once from the repository root before running <code>-profile docker</code> (or pass <code>--container_image</code> to point to a registry image or Singularity <code>.sif</code> file):</p>
+        <p>No manual environment build is required for standard runs: <code>-profile docker</code> and <code>-profile singularity</code> pull the prebuilt image <code>ghcr.io/jsede/viromics:2.0.2</code> automatically from GitHub Container Registry (GHCR), while <code>-profile conda</code> and <code>-profile micromamba</code> provision pinned tools from <code>pipeline/environment.yml</code>. Pass <code>--container_image</code> to point to a custom registry image, local Docker tag, or Singularity <code>.sif</code> file:</p>
 
         <div class="code-container">
           <div class="code-header">
             <span>BASH</span>
             <button class="copy-btn" onclick="copyCode(this)">Copy</button>
           </div>
-          <pre><code># Option A: Let Nextflow provision pipeline/environment.yml automatically
-#           via -profile conda or -profile micromamba (no manual build needed)
-#           Or create a local env manually:
-conda env create -f pipeline/environment.yml
-conda activate viromics
+          <pre><code># Default: Zero manual setup needed — just pass one of:
+#   -profile docker        (pulls ghcr.io/jsede/viromics:2.0.2 automatically)
+#   -profile singularity   (pulls ghcr.io/jsede/viromics:2.0.2 automatically)
+#   -profile conda         (provisions pipeline/environment.yml)
+#   -profile micromamba    (provisions pipeline/environment.yml via micromamba)
 
-# Option B: Build local Docker image once before running -profile docker
-docker build -t viromics:2.0.1 .</code></pre>
+# Optional (local development): Build the container image locally from Dockerfile
+docker build -t viromics:2.0.2 .
+# Then run with: -profile docker --container_image viromics:2.0.2</code></pre>
         </div>
 
         <h3>2. Dashboard Compilation</h3>
@@ -1232,7 +1233,7 @@ npm run dev
               <tr>
                 <td><code>--container_image</code></td>
                 <td>String</td>
-                <td><code>'viromics:2.0.1'</code></td>
+                <td><code>'ghcr.io/jsede/viromics:2.0.2'</code></td>
                 <td>Docker image tag or Singularity <code>.sif</code> path used with <code>-profile docker</code> or <code>-profile singularity</code>.</td>
               </tr>
               <tr>
@@ -1278,7 +1279,7 @@ npm run dev
               <select id="builderProfile" class="builder-select" onchange="updateBuilderCommand()">
                 <option value="conda" selected>Conda (environment.yml)</option>
                 <option value="micromamba">Micromamba (environment.yml)</option>
-                <option value="docker">Docker (Dockerfile)</option>
+                <option value="docker">Docker (GHCR)</option>
                 <option value="singularity">Singularity / Apptainer</option>
               </select>
             </div>

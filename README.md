@@ -52,15 +52,17 @@ An integrated suite for genomic epidemiology of viral pathogens. It combines a m
 - **Conda**, **Micromamba**, or **Docker** (or **Singularity**)
 - **Node.js** (v18+) and **npm**
 
-### 2. Container Build (Optional, for `-profile docker`)
-Because `params.container_image` defaults to the local tag `viromics:2.0.1`, build the container image once from the repository root before running with `-profile docker`:
+### 2. Container Execution (Docker / Singularity)
+`-profile docker` and `-profile singularity` pull the prebuilt image **`ghcr.io/jsede/viromics:2.0.2`** automatically from GitHub Container Registry (GHCR) — no manual build is required. Pass `--container_image <image_or_sif>` to pin a different tag, registry image, or local Singularity `.sif` file.
+
+For local development or custom Dockerfile edits, you can optionally build and run a local image instead:
 ```bash
-docker build -t viromics:2.0.1 .
+docker build -t viromics:2.0.2 .
+# Then pass: -profile docker --container_image viromics:2.0.2
 ```
-Pass `--container_image <image_or_sif>` to override the default tag with a custom registry image or Singularity `.sif` path.
 
 > [!NOTE]
-> If you use Conda or Micromamba instead of Docker, no manual build step is needed — pass `-profile conda` or `-profile micromamba` and Nextflow will provision the pinned environment from `pipeline/environment.yml` automatically.
+> If you prefer Conda or Micromamba instead of containers, pass `-profile conda` or `-profile micromamba` and Nextflow will provision the pinned environment from `pipeline/environment.yml` automatically.
 
 ### 3. Dashboard Compilation
 Navigate to the `dashboard/` directory, install dependencies, and build the production bundle:
@@ -121,7 +123,7 @@ nextflow run pipeline/main.nf \
 | `--min_iupac_freq` / `--max_iupac_freq` | `0.25` / `0.75` | Allele frequency band for IUPAC biallelic SNP coding |
 | `--qc_pass_depth` / `--qc_pass_breadth` / `--qc_pass_max_n` | `100` / `95.0` / `5.0` | Callable-target QC `PASS` thresholds (mean depth, breadth %, internal N %) |
 | `--qc_warn_depth` / `--qc_warn_breadth` / `--qc_warn_max_n` | `25` / `80.0` / `10.0` | Callable-target QC `WARN` thresholds (mean depth, breadth %, internal N %) |
-| `--container_image` | `'viromics:2.0.1'` | Container image tag or Singularity `.sif` path for `-profile docker` / `-profile singularity` |
+| `--container_image` | `'ghcr.io/jsede/viromics:2.0.2'` | Container image tag or Singularity `.sif` path for `-profile docker` / `-profile singularity` |
 | `--max_cpus` / `--max_memory` / `--max_time` | `16` / `'32.GB'` / `'24.h'` | Maximum per-process resource ceilings enforced across all tasks |
 | `--outdir` | `./results` | Target directory to write execution results |
 | `-profile` | `standard` | Environment configuration profile (`conda`, `micromamba`, `docker`, `singularity`, or `standard`) |
@@ -147,7 +149,7 @@ barcode26,2026-04-01,Sydney,Bat
 ```
 
 ### 3. Run Pipeline Execution
-Example execution using Oxford Nanopore multiplexed reads and a primer BED scheme under the Conda profile (substitute `-profile micromamba`, or `-profile docker` after building `viromics:2.0.1` above):
+Example execution using Oxford Nanopore multiplexed reads and a primer BED scheme under the Conda profile (substitute `-profile micromamba`, `-profile docker`, or `-profile singularity` — Docker and Singularity pull `ghcr.io/jsede/viromics:2.0.2` automatically):
 ```bash
 nextflow run pipeline/main.nf \
   --platform ont \

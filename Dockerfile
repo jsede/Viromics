@@ -1,7 +1,7 @@
 FROM mambaorg/micromamba:2.0.5
 
 LABEL org.opencontainers.image.title="Viromics" \
-      org.opencontainers.image.version="2.0.1" \
+      org.opencontainers.image.version="2.0.2" \
       org.opencontainers.image.description="Amplicon-based viral whole-genome sequencing and genomic epidemiology pipeline" \
       org.opencontainers.image.licenses="GPL-3.0"
 

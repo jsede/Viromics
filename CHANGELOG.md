@@ -2,6 +2,12 @@
 
 All notable changes to Viromics are documented in this file.
 
+## [2.0.2] — Prebuilt GHCR Container Default
+
+### Packaging & Distribution
+- **Automated GHCR Publishing:** Published multi-tag container images to GitHub Container Registry (`ghcr.io/jsede/viromics`) via GitHub Actions on pushes and version tags.
+- **Zero-Build Container Default:** Updated default `params.container_image` to `'ghcr.io/jsede/viromics:2.0.2'` across `pipeline/nextflow.config`, `nextflow_schema.json`, `pipeline/main.nf`, `README.md`, and `wiki.html` so `-profile docker` and `-profile singularity` pull the prebuilt image automatically out of the box (keeping local `docker build` as an optional local-development workflow).
+
 ## [2.0.1] — Container Portability & Nextflow 26 Fixes
 
 ### Fixes & Portability
