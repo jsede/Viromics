@@ -55,7 +55,7 @@ def helpMessage() {
       --qc_warn_depth       QC WARN min mean depth on callable target (default: 25)
       --qc_warn_breadth     QC WARN min callable breadth % at min_coverage (default: 80.0)
       --qc_warn_max_n       QC WARN max internal N % (default: 10.0)
-      --container_image     Container image tag or Singularity .sif path (default: 'viromics:2.0.0')
+      --container_image     Container image tag or Singularity .sif path (default: 'viromics:2.0.1')
       --max_cpus            Maximum CPUs permitted per process (default: 16)
       --max_memory          Maximum memory permitted per process (default: '32.GB')
       --max_time            Maximum wall-clock time permitted per process (default: '24.h')
@@ -398,15 +398,15 @@ workflow {
     CONSENSUS_GEN(consensus_input_ch, ref_ch, min_consensus_depth, min_map_qual, min_base_qual, use_iupac)
     
     // Select one deterministic versions_*.yml per process (lexicographically first sample_id) so -resume caches AGGREGATE_METRICS
-    ch_versions = FASTQ_QC.out.versions.toSortedList { a, b -> a[0] <=> b[0] }.map { it[0][1] }
-        .mix(ALIGN_READS.out.versions.toSortedList { a, b -> a[0] <=> b[0] }.map { it[0][1] })
-        .mix(PRIMER_TRIM.out.versions.toSortedList { a, b -> a[0] <=> b[0] }.map { it[0][1] })
-        .mix(VARIANT_CALL.out.versions.toSortedList { a, b -> a[0] <=> b[0] }.map { it[0][1] })
-        .mix(CONSENSUS_GEN.out.versions.toSortedList { a, b -> a[0] <=> b[0] }.map { it[0][1] })
+    ch_versions = FASTQ_QC.out.versions.toSortedList { a, b -> a[0] <=> b[0] }.filter { it && it[0] != null && it[0].size() > 1 && it[0][1] != null }.map { it[0][1] }
+        .mix(ALIGN_READS.out.versions.toSortedList { a, b -> a[0] <=> b[0] }.filter { it && it[0] != null && it[0].size() > 1 && it[0][1] != null }.map { it[0][1] })
+        .mix(PRIMER_TRIM.out.versions.toSortedList { a, b -> a[0] <=> b[0] }.filter { it && it[0] != null && it[0].size() > 1 && it[0][1] != null }.map { it[0][1] })
+        .mix(VARIANT_CALL.out.versions.toSortedList { a, b -> a[0] <=> b[0] }.filter { it && it[0] != null && it[0].size() > 1 && it[0][1] != null }.map { it[0][1] })
+        .mix(CONSENSUS_GEN.out.versions.toSortedList { a, b -> a[0] <=> b[0] }.filter { it && it[0] != null && it[0].size() > 1 && it[0][1] != null }.map { it[0][1] })
     if (params.platform == 'illumina') {
         ch_versions = ch_versions.mix(INDEX_REFERENCE.out.versions)
     }
-    versions_files = ch_versions.toSortedList { a, b -> a.name <=> b.name }
+    versions_files = ch_versions.filter { it != null }.toSortedList { a, b -> a.name <=> b.name }
 
     // Deterministic run provenance (no wall-clock timestamps so -resume caches AGGREGATE_METRICS)
     def run_config_map = [

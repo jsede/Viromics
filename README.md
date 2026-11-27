@@ -15,7 +15,7 @@ An integrated suite for genomic epidemiology of viral pathogens. It combines a m
 - **Variant Calling & Translation**: Hardened `bcftools` (`-B` no-BAQ, configurable `--ont_mpileup_config`, `bcftools norm -m -any`, deterministic strand-balanced downsampling on ultra-deep amplicons), `FORMAT/AD` + `FORMAT/DP` filtering, GFF3 `phase`-accurate translation with staged `--cds_models` + slippery-site verification, in-frame vs. frameshift indel classification, and structured overlapping-gene consequences.
 - **Resilient Consensus Assembly**: Strict decoupling of reported subclonal variants (`AF >= min_freq`) from consensus assembly (`AF >= min_consensus_freq`, default `0.50`), optional biallelic SNP IUPAC ambiguity coding (`--use_iupac`), and deletion-safe low-coverage masking (`samtools depth -aa -J -Q -q -G 0xF04`) with reference-coordinate `low_coverage_intervals`.
 - **Epidemiological Distance & Schema Provenance**: Whole-genome SNP distance matrices (`distance_matrices`, `snp_distance_matrices`, `compared_sites_matrices`) emitting `null` for zero-overlap pairs, full `run_config` + `software_versions` provenance, parameter validation against [`nextflow_schema.json`](nextflow_schema.json), and report validation against [`schema/viromics_run_report.schema.json`](schema/viromics_run_report.schema.json).
-- **Reproducible Packaging & Synthetic CI**: Pinned [`pipeline/environment.yml`](pipeline/environment.yml) (`-profile conda`), unified [`Dockerfile`](Dockerfile) (`-profile docker` / `-profile singularity`), and a deterministic synthetic E2E test suite (`pipeline/test_data/` + `verify_e2e.py`).
+- **Reproducible Packaging & Synthetic CI**: Pinned [`pipeline/environment.yml`](pipeline/environment.yml) (`-profile conda` / `-profile micromamba`), unified [`Dockerfile`](Dockerfile) (`-profile docker` / `-profile singularity`), and a deterministic synthetic E2E test suite (`pipeline/test_data/` + `verify_e2e.py`).
 
 ### React Web Dashboard
 - **Zero-Database, Schema-Driven Design**: Client-side application that dynamically consumes `viromics_run_report.json` (`v2.0.0` schema with `v1` fallback), adapting QC tiers, thresholds, run configuration, and software provenance automatically.
@@ -31,7 +31,7 @@ An integrated suite for genomic epidemiology of viral pathogens. It combines a m
 
 - `pipeline/`: Modular Nextflow (DSL2) workflow script and processes.
   - `main.nf`: Core workflow script with parameter schema validation and samplesheet `platform` enforcement.
-  - `nextflow.config`: Parameter sets, process resource limits, and `conda`/`docker`/`singularity` profiles.
+  - `nextflow.config`: Parameter sets, process resource limits, and `conda`/`micromamba`/`docker`/`singularity` profiles.
   - `environment.yml`: Pinned Conda specification (`python=3.12`, `jsonschema`, `fastp`, `fastplong`, `bwa`, `minimap2`, `samtools`, `bcftools`, `htslib`).
   - `modules/`: Decoupled Nextflow process definitions.
   - `bin/parse_metrics.py`: Metric aggregator, variant translator, and distance matrix calculator.
@@ -49,10 +49,20 @@ An integrated suite for genomic epidemiology of viral pathogens. It combines a m
 
 ### 1. Pre-requisites
 - **Nextflow** (&ge; 23.04; tested on v26+)
-- **Conda** or **Docker**
+- **Conda**, **Micromamba**, or **Docker** (or **Singularity**)
 - **Node.js** (v18+) and **npm**
 
-### 2. Dashboard Compilation
+### 2. Container Build (Optional, for `-profile docker`)
+Because `params.container_image` defaults to the local tag `viromics:2.0.1`, build the container image once from the repository root before running with `-profile docker`:
+```bash
+docker build -t viromics:2.0.1 .
+```
+Pass `--container_image <image_or_sif>` to override the default tag with a custom registry image or Singularity `.sif` path.
+
+> [!NOTE]
+> If you use Conda or Micromamba instead of Docker, no manual build step is needed — pass `-profile conda` or `-profile micromamba` and Nextflow will provision the pinned environment from `pipeline/environment.yml` automatically.
+
+### 3. Dashboard Compilation
 Navigate to the `dashboard/` directory, install dependencies, and build the production bundle:
 ```bash
 cd dashboard
@@ -111,10 +121,10 @@ nextflow run pipeline/main.nf \
 | `--min_iupac_freq` / `--max_iupac_freq` | `0.25` / `0.75` | Allele frequency band for IUPAC biallelic SNP coding |
 | `--qc_pass_depth` / `--qc_pass_breadth` / `--qc_pass_max_n` | `100` / `95.0` / `5.0` | Callable-target QC `PASS` thresholds (mean depth, breadth %, internal N %) |
 | `--qc_warn_depth` / `--qc_warn_breadth` / `--qc_warn_max_n` | `25` / `80.0` / `10.0` | Callable-target QC `WARN` thresholds (mean depth, breadth %, internal N %) |
-| `--container_image` | `'viromics:2.0.0'` | Container image tag or Singularity `.sif` path for `-profile docker` / `-profile singularity` |
+| `--container_image` | `'viromics:2.0.1'` | Container image tag or Singularity `.sif` path for `-profile docker` / `-profile singularity` |
 | `--max_cpus` / `--max_memory` / `--max_time` | `16` / `'32.GB'` / `'24.h'` | Maximum per-process resource ceilings enforced across all tasks |
 | `--outdir` | `./results` | Target directory to write execution results |
-| `-profile` | `standard` | Environment configuration profile (`conda`, `docker`, `singularity`, or `standard`) |
+| `-profile` | `standard` | Environment configuration profile (`conda`, `micromamba`, `docker`, `singularity`, or `standard`) |
 
 ---
 
@@ -137,7 +147,7 @@ barcode26,2026-04-01,Sydney,Bat
 ```
 
 ### 3. Run Pipeline Execution
-Example execution using Oxford Nanopore multiplexed reads and a primer BED scheme under the Conda profile:
+Example execution using Oxford Nanopore multiplexed reads and a primer BED scheme under the Conda profile (substitute `-profile micromamba`, or `-profile docker` after building `viromics:2.0.1` above):
 ```bash
 nextflow run pipeline/main.nf \
   --platform ont \

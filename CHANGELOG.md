@@ -2,6 +2,14 @@
 
 All notable changes to Viromics are documented in this file.
 
+## [2.0.1] — Container Portability & Nextflow 26 Fixes
+
+### Fixes & Portability
+- **Docker Container (`Dockerfile`):** Installed `procps` after activating `/opt/conda/bin` (keeping the `micromamba install` layer cached) so Nextflow container task-metrics (`ps`) work on minimal `mambaorg/micromamba` images; replaced deprecated `jsonschema.__version__` check with `importlib.metadata.version('jsonschema')`; updated OCI `org.opencontainers.image.licenses` label to `GPL-3.0`.
+- **Execution Profiles & Config (`pipeline/nextflow.config`):** Resolved `WARN: Access to undefined parameter 'container_image'` on Nextflow 26+ by assigning `process.container = params.container_image` directly in `docker` and `singularity` profiles; added a built-in `-profile micromamba` (`conda.useMicromamba = true`) alongside `-profile conda`; bumped default `container_image` to `viromics:2.0.1`.
+- **Early-Abort Shutdown Safety (`pipeline/main.nf`):** Added null-safe guards around the `versions` `.toSortedList(...).map { it[0][1] }` channel operators so early upstream failures (e.g., `FASTQ_QC`) shut down cleanly and render `execution_report.html` without cascading into `Cannot invoke method getAt() on null object`.
+- **Documentation (`README.md`, `wiki.html`):** Documented building the local `viromics:2.0.1` Docker image prior to `-profile docker` and added `-profile micromamba` to quickstart docs and the interactive command builder.
+
 ## [2.0.0] — Milestone 1–5 Scientific & Engineering Release
 
 ### Scientific & Bioinformatics Fixes (Pipeline)

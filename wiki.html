@@ -962,20 +962,22 @@
           </table>
         </div>
 
-        <h3>1. Pipeline Environment &amp; Container Setup (Conda / Docker / Singularity)</h3>
-        <p>The pipeline automatically provisions pinned bioinformatics tools from <code>pipeline/environment.yml</code> when executed with <code>-profile conda</code>, or inside a reproducible micromamba image (<code>Dockerfile</code>) via <code>-profile docker</code> or <code>-profile singularity</code> (overridable via <code>--container_image</code>):</p>
+        <h3>1. Pipeline Environment &amp; Container Setup (Conda / Micromamba / Docker / Singularity)</h3>
+        <p>The pipeline automatically provisions pinned bioinformatics tools from <code>pipeline/environment.yml</code> when executed with <code>-profile conda</code> or <code>-profile micromamba</code>, or runs inside the reproducible micromamba image (<code>Dockerfile</code>) via <code>-profile docker</code> or <code>-profile singularity</code>. Because <code>params.container_image</code> defaults to the local tag <code>viromics:2.0.1</code>, build the image once from the repository root before running <code>-profile docker</code> (or pass <code>--container_image</code> to point to a registry image or Singularity <code>.sif</code> file):</p>
 
         <div class="code-container">
           <div class="code-header">
             <span>BASH</span>
             <button class="copy-btn" onclick="copyCode(this)">Copy</button>
           </div>
-          <pre><code># Option A: Create conda environment directly from pinned pipeline/environment.yml
+          <pre><code># Option A: Let Nextflow provision pipeline/environment.yml automatically
+#           via -profile conda or -profile micromamba (no manual build needed)
+#           Or create a local env manually:
 conda env create -f pipeline/environment.yml
 conda activate viromics
 
-# Option B: Build reproducible container image for -profile docker / singularity
-docker build -t viromics:2.0.0 .</code></pre>
+# Option B: Build local Docker image once before running -profile docker
+docker build -t viromics:2.0.1 .</code></pre>
         </div>
 
         <h3>2. Dashboard Compilation</h3>
@@ -1230,7 +1232,7 @@ npm run dev
               <tr>
                 <td><code>--container_image</code></td>
                 <td>String</td>
-                <td><code>'viromics:2.0.0'</code></td>
+                <td><code>'viromics:2.0.1'</code></td>
                 <td>Docker image tag or Singularity <code>.sif</code> path used with <code>-profile docker</code> or <code>-profile singularity</code>.</td>
               </tr>
               <tr>
@@ -1275,6 +1277,7 @@ npm run dev
               <label class="builder-label">Execution Profile</label>
               <select id="builderProfile" class="builder-select" onchange="updateBuilderCommand()">
                 <option value="conda" selected>Conda (environment.yml)</option>
+                <option value="micromamba">Micromamba (environment.yml)</option>
                 <option value="docker">Docker (Dockerfile)</option>
                 <option value="singularity">Singularity / Apptainer</option>
               </select>
